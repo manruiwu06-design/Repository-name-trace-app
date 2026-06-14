@@ -59,6 +59,11 @@ export default function TripDetailPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [previewImage, setPreviewImage] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
+
   const [showEditModal, setShowEditModal] = useState(false);
 
   const [editForm, setEditForm] = useState({
@@ -762,11 +767,26 @@ export default function TripDetailPage() {
                             )}
 
                             {item.image_url && (
-                              <img
-                                src={item.image_url}
-                                alt={`${item.title} 的行程图片`}
-                                className="mt-4 h-28 w-full max-w-[260px] rounded-xl border border-zinc-700 object-cover sm:h-32 sm:max-w-xs md:h-36"
-                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    url: item.image_url as string,
+                                    title: item.title,
+                                  })
+                                }
+                                className="mt-4 block w-fit text-left"
+                              >
+                                <img
+                                  src={item.image_url}
+                                  alt={`${item.title} 的行程图片`}
+                                  className="h-28 w-full max-w-[260px] rounded-xl border border-zinc-700 object-cover transition hover:border-cyan-400 sm:h-32 sm:max-w-xs md:h-36"
+                                />
+
+                                <p className="mt-2 text-xs text-zinc-500">
+                                  点击查看大图
+                                </p>
+                              </button>
                             )}
                           </div>
 
@@ -1151,11 +1171,26 @@ export default function TripDetailPage() {
                 <div>
                   <p className="mb-2 text-sm text-zinc-400">当前图片</p>
 
-                  <img
-                    src={editItemForm.imageUrl}
-                    alt="当前行程图片"
-                    className="h-32 w-full max-w-xs rounded-xl border border-zinc-700 object-cover sm:h-36"
-                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewImage({
+                        url: editItemForm.imageUrl,
+                        title: editItemForm.title || "当前行程图片",
+                      })
+                    }
+                    className="block w-fit text-left"
+                  >
+                    <img
+                      src={editItemForm.imageUrl}
+                      alt="当前行程图片"
+                      className="h-32 w-full max-w-xs rounded-xl border border-zinc-700 object-cover transition hover:border-cyan-400 sm:h-36"
+                    />
+
+                    <p className="mt-2 text-xs text-zinc-500">
+                      点击查看大图
+                    </p>
+                  </button>
                 </div>
               )}
 
@@ -1287,6 +1322,44 @@ export default function TripDetailPage() {
                 保存修改
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl"
+          >
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-zinc-500">图片预览</p>
+                <h3 className="text-lg font-semibold text-white">
+                  {previewImage.title}
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="rounded-full bg-zinc-800 px-4 py-2 text-sm text-white hover:bg-zinc-700"
+              >
+                关闭
+              </button>
+            </div>
+
+            <img
+              src={previewImage.url}
+              alt={previewImage.title}
+              className="max-h-[78vh] w-full rounded-2xl border border-zinc-700 object-contain"
+            />
+
+            <p className="mt-3 text-center text-xs text-zinc-500">
+              点击黑色背景也可以关闭
+            </p>
           </div>
         </div>
       )}
