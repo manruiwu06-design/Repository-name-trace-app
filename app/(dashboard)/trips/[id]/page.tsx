@@ -67,6 +67,17 @@ export default function TripDetailPage() {
     notes: "",
   });
 
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+
+  const [editItemForm, setEditItemForm] = useState({
+    dayNumber: "1",
+    time: "",
+    title: "",
+    category: "景点",
+    notes: "",
+  });
+
   const [expenseForm, setExpenseForm] = useState({
     category: "餐饮",
     amount: "",
@@ -223,6 +234,62 @@ export default function TripDetailPage() {
     }
 
     setForm({
+      dayNumber: "1",
+      time: "",
+      title: "",
+      category: "景点",
+      notes: "",
+    });
+
+    fetchItineraryItems();
+  }
+
+  function openEditItineraryModal(item: ItineraryItem) {
+    setEditingItemId(item.id);
+
+    setEditItemForm({
+      dayNumber: String(item.day_number),
+      time: item.time || "",
+      title: item.title || "",
+      category: item.category || "景点",
+      notes: item.notes || "",
+    });
+
+    setShowEditItemModal(true);
+  }
+
+  async function updateItineraryItem() {
+    if (!editingItemId) {
+      alert("未找到要编辑的行程");
+      return;
+    }
+
+    if (!editItemForm.title) {
+      alert("请填写行程名称");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("itinerary_items")
+      .update({
+        day_number: Number(editItemForm.dayNumber),
+        time: editItemForm.time || null,
+        title: editItemForm.title,
+        category: editItemForm.category || "景点",
+        notes: editItemForm.notes || null,
+      })
+      .eq("id", editingItemId)
+      .eq("trip_id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setShowEditItemModal(false);
+    setEditingItemId(null);
+
+    setEditItemForm({
       dayNumber: "1",
       time: "",
       title: "",
@@ -471,12 +538,21 @@ export default function TripDetailPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => deleteItineraryItem(item.id)}
-                    className="h-fit rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
-                  >
-                    删除
-                  </button>
+                  <div className="flex h-fit gap-2">
+                    <button
+                      onClick={() => openEditItineraryModal(item)}
+                      className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
+                    >
+                      编辑
+                    </button>
+
+                    <button
+                      onClick={() => deleteItineraryItem(item.id)}
+                      className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                    >
+                      删除
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -681,6 +757,103 @@ export default function TripDetailPage() {
 
               <button
                 onClick={updateTrip}
+                className="px-5 py-3 rounded-xl bg-cyan-500 text-black font-semibold"
+              >
+                保存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditItemModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="w-full max-w-xl rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
+            <h2 className="text-2xl font-bold mb-6">编辑每日行程</h2>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  placeholder="第几天"
+                  value={editItemForm.dayNumber}
+                  onChange={(e) =>
+                    setEditItemForm({
+                      ...editItemForm,
+                      dayNumber: e.target.value,
+                    })
+                  }
+                  className="rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+                />
+
+                <input
+                  type="time"
+                  value={editItemForm.time}
+                  onChange={(e) =>
+                    setEditItemForm({
+                      ...editItemForm,
+                      time: e.target.value,
+                    })
+                  }
+                  className="rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+                />
+              </div>
+
+              <input
+                placeholder="行程名称"
+                value={editItemForm.title}
+                onChange={(e) =>
+                  setEditItemForm({
+                    ...editItemForm,
+                    title: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              />
+
+              <select
+                value={editItemForm.category}
+                onChange={(e) =>
+                  setEditItemForm({
+                    ...editItemForm,
+                    category: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              >
+                <option>景点</option>
+                <option>美食</option>
+                <option>住宿</option>
+                <option>交通</option>
+                <option>购物</option>
+                <option>其他</option>
+              </select>
+
+              <textarea
+                placeholder="备注，例如：早上去人少、需要提前预约"
+                value={editItemForm.notes}
+                onChange={(e) =>
+                  setEditItemForm({
+                    ...editItemForm,
+                    notes: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditItemModal(false);
+                  setEditingItemId(null);
+                }}
+                className="px-5 py-3 rounded-xl bg-zinc-800"
+              >
+                取消
+              </button>
+
+              <button
+                onClick={updateItineraryItem}
                 className="px-5 py-3 rounded-xl bg-cyan-500 text-black font-semibold"
               >
                 保存修改
