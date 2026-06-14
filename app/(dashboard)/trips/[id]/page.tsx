@@ -438,6 +438,22 @@ export default function TripDetailPage() {
   const totalBudget = Number(trip?.budget || 0);
   const remainingBudget = totalBudget - totalSpent;
 
+  const expenseByCategory = expenses.reduce<Record<string, number>>(
+    (result, expense) => {
+      const category = expense.category || "其他";
+      const amount = Number(expense.amount || 0);
+
+      result[category] = (result[category] || 0) + amount;
+
+      return result;
+    },
+    {}
+  );
+
+  const expenseCategoryEntries = Object.entries(expenseByCategory).sort(
+    (a, b) => b[1] - a[1]
+  );
+
   const groupedItems = items.reduce<Record<number, ItineraryItem[]>>(
     (groups, item) => {
       const dayNumber = item.day_number || 1;
@@ -671,6 +687,42 @@ export default function TripDetailPage() {
                 </span>
               </p>
             </div>
+          </div>
+
+          <div className="rounded-2xl bg-zinc-900 p-6">
+            <h2 className="text-xl font-semibold mb-4">费用分类汇总</h2>
+
+            {expenseCategoryEntries.length === 0 ? (
+              <p className="text-zinc-500">还没有费用分类数据</p>
+            ) : (
+              <div className="space-y-4">
+                {expenseCategoryEntries.map(([category, amount]) => {
+                  const percent =
+                    totalSpent > 0
+                      ? Math.round((amount / totalSpent) * 100)
+                      : 0;
+
+                  return (
+                    <div key={category}>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-zinc-300">{category}</span>
+
+                        <span className="text-zinc-400">
+                          ¥{amount} · {percent}%
+                        </span>
+                      </div>
+
+                      <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-cyan-500"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl bg-zinc-900 p-6">
