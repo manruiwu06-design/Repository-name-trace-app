@@ -551,6 +551,8 @@ export default function TripDetailPage() {
           return category === expenseFilter;
         });
 
+  const photoWallItems = items.filter((item) => item.image_url);
+
   const groupedItems = items.reduce<Record<number, ItineraryItem[]>>(
     (groups, item) => {
       const dayNumber = item.day_number || 1;
@@ -645,6 +647,59 @@ export default function TripDetailPage() {
             {trip.start_date || "未填写"} - {trip.end_date || "未填写"}
           </h2>
         </div>
+      </div>
+
+      <div className="mb-8 rounded-2xl bg-zinc-900 p-5 sm:p-6">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">旅行照片墙</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              自动汇总这趟旅行所有行程图片
+            </p>
+          </div>
+
+          <span className="w-fit rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-400">
+            {photoWallItems.length} 张照片
+          </span>
+        </div>
+
+        {photoWallItems.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-zinc-800 bg-black/20 p-6 text-sm text-zinc-500">
+            还没有旅行照片。给每日行程上传图片后，这里会自动生成照片墙。
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {photoWallItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() =>
+                  setPreviewImage({
+                    url: item.image_url as string,
+                    title: item.title,
+                  })
+                }
+                className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-left"
+              >
+                <img
+                  src={item.image_url as string}
+                  alt={`${item.title} 的照片`}
+                  className="aspect-square w-full object-cover transition duration-300 group-hover:scale-105"
+                />
+
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3">
+                  <p className="truncate text-sm font-semibold text-white">
+                    {item.title}
+                  </p>
+
+                  <p className="mt-1 text-xs text-zinc-300">
+                    第 {item.day_number || 1} 天 · {item.category || "其他"}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
