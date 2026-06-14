@@ -438,6 +438,25 @@ export default function TripDetailPage() {
   const totalBudget = Number(trip?.budget || 0);
   const remainingBudget = totalBudget - totalSpent;
 
+  const groupedItems = items.reduce<Record<number, ItineraryItem[]>>(
+    (groups, item) => {
+      const dayNumber = item.day_number || 1;
+
+      if (!groups[dayNumber]) {
+        groups[dayNumber] = [];
+      }
+
+      groups[dayNumber].push(item);
+
+      return groups;
+    },
+    {}
+  );
+
+  const groupedItemEntries = Object.entries(groupedItems).sort(
+    ([dayA], [dayB]) => Number(dayA) - Number(dayB)
+  );
+
   if (loading) {
     return (
       <main className="p-8 text-white">
@@ -573,44 +592,60 @@ export default function TripDetailPage() {
             + 添加行程
           </button>
 
-          <div className="space-y-3">
+          <div className="space-y-6">
             {items.length === 0 ? (
               <p className="text-zinc-500">还没有添加行程</p>
             ) : (
-              items.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl bg-zinc-800 p-4 flex justify-between gap-4"
-                >
-                  <div>
-                    <p className="text-sm text-cyan-400">
-                      第 {item.day_number} 天 · {item.time || "未填写时间"} ·{" "}
-                      {item.category || "其他"}
-                    </p>
-
-                    <h3 className="text-lg font-semibold mt-1">
-                      {item.title}
+              groupedItemEntries.map(([dayNumber, dayItems]) => (
+                <div key={dayNumber} className="rounded-2xl bg-black/30 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-cyan-400">
+                      第 {dayNumber} 天
                     </h3>
 
-                    {item.notes && (
-                      <p className="text-zinc-400 mt-2">{item.notes}</p>
-                    )}
+                    <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-400">
+                      {dayItems.length} 个行程
+                    </span>
                   </div>
 
-                  <div className="flex h-fit gap-2">
-                    <button
-                      onClick={() => openEditItineraryModal(item)}
-                      className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
-                    >
-                      编辑
-                    </button>
+                  <div className="space-y-3">
+                    {dayItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl bg-zinc-800 p-4 flex justify-between gap-4"
+                      >
+                        <div>
+                          <p className="text-sm text-cyan-400">
+                            {item.time || "未填写时间"} ·{" "}
+                            {item.category || "其他"}
+                          </p>
 
-                    <button
-                      onClick={() => deleteItineraryItem(item.id)}
-                      className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
-                    >
-                      删除
-                    </button>
+                          <h3 className="text-lg font-semibold mt-1">
+                            {item.title}
+                          </h3>
+
+                          {item.notes && (
+                            <p className="text-zinc-400 mt-2">{item.notes}</p>
+                          )}
+                        </div>
+
+                        <div className="flex h-fit gap-2">
+                          <button
+                            onClick={() => openEditItineraryModal(item)}
+                            className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
+                          >
+                            编辑
+                          </button>
+
+                          <button
+                            onClick={() => deleteItineraryItem(item.id)}
+                            className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))
