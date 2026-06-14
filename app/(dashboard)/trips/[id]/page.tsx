@@ -84,6 +84,15 @@ export default function TripDetailPage() {
     description: "",
   });
 
+  const [showEditExpenseModal, setShowEditExpenseModal] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+
+  const [editExpenseForm, setEditExpenseForm] = useState({
+    category: "餐饮",
+    amount: "",
+    description: "",
+  });
+
   useEffect(() => {
     if (id) {
       initPage();
@@ -345,6 +354,56 @@ export default function TripDetailPage() {
     }
 
     setExpenseForm({
+      category: "餐饮",
+      amount: "",
+      description: "",
+    });
+
+    fetchExpenses();
+  }
+
+  function openEditExpenseModal(expense: Expense) {
+    setEditingExpenseId(expense.id);
+
+    setEditExpenseForm({
+      category: expense.category || "餐饮",
+      amount: String(expense.amount || ""),
+      description: expense.description || "",
+    });
+
+    setShowEditExpenseModal(true);
+  }
+
+  async function updateExpense() {
+    if (!editingExpenseId) {
+      alert("未找到要编辑的费用");
+      return;
+    }
+
+    if (!editExpenseForm.amount) {
+      alert("请填写金额");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("expenses")
+      .update({
+        category: editExpenseForm.category || "其他",
+        amount: Number(editExpenseForm.amount),
+        description: editExpenseForm.description || null,
+      })
+      .eq("id", editingExpenseId)
+      .eq("trip_id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setShowEditExpenseModal(false);
+    setEditingExpenseId(null);
+
+    setEditExpenseForm({
       category: "餐饮",
       amount: "",
       description: "",
@@ -662,12 +721,21 @@ export default function TripDetailPage() {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => deleteExpense(expense.id)}
-                      className="h-fit rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
-                    >
-                      删除
-                    </button>
+                    <div className="flex h-fit gap-2">
+                      <button
+                        onClick={() => openEditExpenseModal(expense)}
+                        className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
+                      >
+                        编辑
+                      </button>
+
+                      <button
+                        onClick={() => deleteExpense(expense.id)}
+                        className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                      >
+                        删除
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -854,6 +922,77 @@ export default function TripDetailPage() {
 
               <button
                 onClick={updateItineraryItem}
+                className="px-5 py-3 rounded-xl bg-cyan-500 text-black font-semibold"
+              >
+                保存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditExpenseModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="w-full max-w-xl rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
+            <h2 className="text-2xl font-bold mb-6">编辑费用记录</h2>
+
+            <div className="space-y-4">
+              <select
+                value={editExpenseForm.category}
+                onChange={(e) =>
+                  setEditExpenseForm({
+                    ...editExpenseForm,
+                    category: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              >
+                <option>餐饮</option>
+                <option>住宿</option>
+                <option>交通</option>
+                <option>门票</option>
+                <option>购物</option>
+                <option>其他</option>
+              </select>
+
+              <input
+                placeholder="金额，例如 120"
+                value={editExpenseForm.amount}
+                onChange={(e) =>
+                  setEditExpenseForm({
+                    ...editExpenseForm,
+                    amount: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              />
+
+              <input
+                placeholder="备注，例如：拉面"
+                value={editExpenseForm.description}
+                onChange={(e) =>
+                  setEditExpenseForm({
+                    ...editExpenseForm,
+                    description: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditExpenseModal(false);
+                  setEditingExpenseId(null);
+                }}
+                className="px-5 py-3 rounded-xl bg-zinc-800"
+              >
+                取消
+              </button>
+
+              <button
+                onClick={updateExpense}
                 className="px-5 py-3 rounded-xl bg-cyan-500 text-black font-semibold"
               >
                 保存修改
