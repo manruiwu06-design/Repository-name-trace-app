@@ -42,6 +42,16 @@ export default function TripDetailPage() {
   const router = useRouter();
   const id = params.id as string;
 
+  const expenseFilterOptions = [
+    "全部",
+    "餐饮",
+    "住宿",
+    "交通",
+    "门票",
+    "购物",
+    "其他",
+  ];
+
   const [userId, setUserId] = useState<string | null>(null);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [items, setItems] = useState<ItineraryItem[]>([]);
@@ -77,6 +87,8 @@ export default function TripDetailPage() {
     category: "景点",
     notes: "",
   });
+
+  const [expenseFilter, setExpenseFilter] = useState("全部");
 
   const [expenseForm, setExpenseForm] = useState({
     category: "餐饮",
@@ -454,6 +466,14 @@ export default function TripDetailPage() {
     (a, b) => b[1] - a[1]
   );
 
+  const filteredExpenses =
+    expenseFilter === "全部"
+      ? expenses
+      : expenses.filter((expense) => {
+          const category = expense.category || "其他";
+          return category === expenseFilter;
+        });
+
   const groupedItems = items.reduce<Record<number, ItineraryItem[]>>(
     (groups, item) => {
       const dayNumber = item.day_number || 1;
@@ -781,13 +801,37 @@ export default function TripDetailPage() {
           </div>
 
           <div className="rounded-2xl bg-zinc-900 p-6">
-            <h2 className="text-xl font-semibold mb-4">费用记录</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold">费用记录</h2>
+
+              <span className="text-xs text-zinc-500">
+                {filteredExpenses.length} 条
+              </span>
+            </div>
+
+            <div className="mb-4 flex flex-wrap gap-2">
+              {expenseFilterOptions.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setExpenseFilter(option)}
+                  className={`rounded-full px-3 py-2 text-xs font-medium transition ${
+                    expenseFilter === option
+                      ? "bg-cyan-500 text-black"
+                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
 
             <div className="space-y-3">
               {expenses.length === 0 ? (
                 <p className="text-zinc-500">还没有费用记录</p>
+              ) : filteredExpenses.length === 0 ? (
+                <p className="text-zinc-500">当前分类暂无费用记录</p>
               ) : (
-                expenses.map((expense) => (
+                filteredExpenses.map((expense) => (
                   <div
                     key={expense.id}
                     className="rounded-xl bg-zinc-800 p-4 flex justify-between gap-4"
