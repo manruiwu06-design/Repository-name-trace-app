@@ -18,6 +18,44 @@ type Trip = {
   end_date?: string | null;
 };
 
+function getTripStatus(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) {
+    return "待完善";
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (today < start) {
+    return "未开始";
+  }
+
+  if (today > end) {
+    return "已完成";
+  }
+
+  return "旅行中";
+}
+
+function getStatusClass(status: string) {
+  if (status === "旅行中") {
+    return "bg-green-500/10 text-green-400";
+  }
+
+  if (status === "未开始") {
+    return "bg-cyan-500/10 text-cyan-400";
+  }
+
+  if (status === "已完成") {
+    return "bg-purple-500/10 text-purple-400";
+  }
+
+  return "bg-zinc-700 text-zinc-300";
+}
+
 export default function TripsPage() {
   const router = useRouter();
 
@@ -160,41 +198,55 @@ export default function TripsPage() {
               </p>
             </div>
           ) : (
-            trips.map((trip) => (
-              <div
-                key={trip.id}
-                className="rounded-2xl bg-zinc-900 p-5 hover:bg-zinc-800 transition"
-              >
-                <Link href={`/trips/${trip.id}`} className="block">
-                  <h2 className="text-xl font-semibold">{trip.title}</h2>
+            trips.map((trip) => {
+              const status = getTripStatus(trip.start_date, trip.end_date);
 
-                  <p className="text-zinc-400 mt-2">
-                    {trip.country || "未填写国家"} ·{" "}
-                    {trip.city || "未填写城市"}
-                  </p>
-
-                  <p className="text-zinc-400 mt-1">
-                    {trip.start_date || trip.startDate || "未填写开始日期"} -{" "}
-                    {trip.end_date || trip.endDate || "未填写结束日期"}
-                  </p>
-
-                  <p className="mt-4">
-                    预算：{trip.budget ? `¥${trip.budget}` : "未填写"}
-                  </p>
-
-                  <p className="mt-4 text-sm text-cyan-400">
-                    点击查看详情 →
-                  </p>
-                </Link>
-
-                <button
-                  onClick={() => deleteTrip(trip.id)}
-                  className="mt-5 rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20"
+              return (
+                <div
+                  key={trip.id}
+                  className="rounded-2xl bg-zinc-900 p-5 hover:bg-zinc-800 transition"
                 >
-                  删除
-                </button>
-              </div>
-            ))
+                  <Link href={`/trips/${trip.id}`} className="block">
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="text-xl font-semibold">{trip.title}</h2>
+
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(
+                          status
+                        )}`}
+                      >
+                        {status}
+                      </span>
+                    </div>
+
+                    <p className="text-zinc-400 mt-3">
+                      {trip.country || "未填写国家"} ·{" "}
+                      {trip.city || "未填写城市"}
+                    </p>
+
+                    <p className="text-zinc-400 mt-1">
+                      {trip.start_date || trip.startDate || "未填写开始日期"} -{" "}
+                      {trip.end_date || trip.endDate || "未填写结束日期"}
+                    </p>
+
+                    <p className="mt-4">
+                      预算：{trip.budget ? `¥${trip.budget}` : "未填写"}
+                    </p>
+
+                    <p className="mt-4 text-sm text-cyan-400">
+                      点击查看详情 →
+                    </p>
+                  </Link>
+
+                  <button
+                    onClick={() => deleteTrip(trip.id)}
+                    className="mt-5 rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                  >
+                    删除
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       )}
