@@ -11,7 +11,7 @@ type Trip = {
   title: string;
   country: string | null;
   city: string | null;
-  budget: number | null;
+  budget: number | string | null;
   start_date: string | null;
   end_date: string | null;
   created_at: string;
@@ -48,6 +48,17 @@ export default function TripDetailPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    title: "",
+    country: "",
+    city: "",
+    budget: "",
+    startDate: "",
+    endDate: "",
+  });
+
   const [form, setForm] = useState({
     dayNumber: "1",
     time: "",
@@ -77,7 +88,6 @@ export default function TripDetailPage() {
     }
 
     setUserId(data.user.id);
-
     await fetchTrip(data.user.id);
   }
 
@@ -132,6 +142,57 @@ export default function TripDetailPage() {
     }
 
     setExpenses(data || []);
+  }
+
+  function openEditModal() {
+    if (!trip) return;
+
+    setEditForm({
+      title: trip.title || "",
+      country: trip.country || "",
+      city: trip.city || "",
+      budget: trip.budget ? String(trip.budget) : "",
+      startDate: trip.start_date || "",
+      endDate: trip.end_date || "",
+    });
+
+    setShowEditModal(true);
+  }
+
+  async function updateTrip() {
+    if (!trip) return;
+
+    if (!userId) {
+      alert("请先登录");
+      router.push("/");
+      return;
+    }
+
+    if (!editForm.title) {
+      alert("请填写旅行名称");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("trips")
+      .update({
+        title: editForm.title,
+        country: editForm.country || null,
+        city: editForm.city || null,
+        budget: editForm.budget ? Number(editForm.budget) : null,
+        start_date: editForm.startDate || null,
+        end_date: editForm.endDate || null,
+      })
+      .eq("id", trip.id)
+      .eq("user_id", userId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setShowEditModal(false);
+    fetchTrip(userId);
   }
 
   async function addItineraryItem() {
@@ -282,11 +343,22 @@ export default function TripDetailPage() {
           ← 返回我的旅行
         </Link>
 
-        <h1 className="text-4xl font-bold mt-4">{trip.title}</h1>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold">{trip.title}</h1>
 
-        <p className="text-zinc-400 mt-2">
-          {trip.country || "未填写国家"} · {trip.city || "未填写城市"}
-        </p>
+            <p className="text-zinc-400 mt-2">
+              {trip.country || "未填写国家"} · {trip.city || "未填写城市"}
+            </p>
+          </div>
+
+          <button
+            onClick={openEditModal}
+            className="rounded-xl bg-zinc-800 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-700"
+          >
+            编辑旅行
+          </button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6 mb-8">
@@ -299,9 +371,7 @@ export default function TripDetailPage() {
 
         <div className="rounded-2xl bg-zinc-900 p-6">
           <p className="text-zinc-400">城市</p>
-          <h2 className="text-2xl font-bold mt-2">
-            {trip.city || "未填写"}
-          </h2>
+          <h2 className="text-2xl font-bold mt-2">{trip.city || "未填写"}</h2>
         </div>
 
         <div className="rounded-2xl bg-zinc-900 p-6">
@@ -529,6 +599,96 @@ export default function TripDetailPage() {
           </div>
         </div>
       </div>
+
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="w-full max-w-xl rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
+            <h2 className="text-2xl font-bold mb-6">编辑旅行信息</h2>
+
+            <div className="space-y-4">
+              <input
+                placeholder="旅行名称"
+                value={editForm.title}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, title: e.target.value })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  placeholder="国家"
+                  value={editForm.country}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, country: e.target.value })
+                  }
+                  className="rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+                />
+
+                <input
+                  placeholder="城市"
+                  value={editForm.city}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, city: e.target.value })
+                  }
+                  className="rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+                />
+              </div>
+
+              <input
+                placeholder="预算"
+                value={editForm.budget}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, budget: e.target.value })
+                }
+                className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="date"
+                  value={editForm.startDate}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      startDate: e.target.value,
+                    })
+                  }
+                  className="rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+                />
+
+                <input
+                  type="date"
+                  value={editForm.endDate}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      endDate: e.target.value,
+                    })
+                  }
+                  className="rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-5 py-3 rounded-xl bg-zinc-800"
+              >
+                取消
+              </button>
+
+              <button
+                onClick={updateTrip}
+                className="px-5 py-3 rounded-xl bg-cyan-500 text-black font-semibold"
+              >
+                保存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
