@@ -73,7 +73,9 @@ export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+
   const [selectedStatus, setSelectedStatus] = useState<TripStatus>("全部");
+  const [searchKeyword, setSearchKeyword] = useState("");
 
   const [form, setForm] = useState({
     title: "",
@@ -157,6 +159,7 @@ export default function TripsPage() {
 
     setShowModal(false);
     setSelectedStatus("全部");
+    setSearchKeyword("");
     fetchTrips(userId);
   }
 
@@ -194,12 +197,20 @@ export default function TripsPage() {
   }
 
   const filteredTrips = trips.filter((trip) => {
-    if (selectedStatus === "全部") {
-      return true;
-    }
-
     const tripStatus = getTripStatus(trip.start_date, trip.end_date);
-    return tripStatus === selectedStatus;
+
+    const matchStatus =
+      selectedStatus === "全部" || tripStatus === selectedStatus;
+
+    const keyword = searchKeyword.trim().toLowerCase();
+
+    const matchKeyword =
+      keyword === "" ||
+      trip.title.toLowerCase().includes(keyword) ||
+      (trip.country || "").toLowerCase().includes(keyword) ||
+      (trip.city || "").toLowerCase().includes(keyword);
+
+    return matchStatus && matchKeyword;
   });
 
   return (
@@ -216,6 +227,30 @@ export default function TripsPage() {
         >
           + 新建旅行
         </button>
+      </div>
+
+      <div className="mb-6 rounded-2xl bg-zinc-900 p-4">
+        <div className="flex gap-3">
+          <input
+            placeholder="搜索旅行名称、国家或城市，例如：日本、东京、樱花"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none text-white placeholder:text-zinc-500"
+          />
+
+          {searchKeyword && (
+            <button
+              onClick={() => setSearchKeyword("")}
+              className="rounded-xl bg-zinc-800 px-5 py-3 text-zinc-300 hover:bg-zinc-700"
+            >
+              清空
+            </button>
+          )}
+        </div>
+
+        <p className="mt-3 text-sm text-zinc-500">
+          当前显示 {filteredTrips.length} 条旅行记录
+        </p>
       </div>
 
       <div className="mb-8 flex flex-wrap gap-3">
@@ -256,7 +291,7 @@ export default function TripsPage() {
               <h2 className="text-xl font-semibold">暂无对应旅行</h2>
 
               <p className="text-zinc-400 mt-2">
-                当前筛选条件下没有旅行记录。
+                当前搜索关键词或筛选条件下没有旅行记录。
               </p>
             </div>
           ) : (
