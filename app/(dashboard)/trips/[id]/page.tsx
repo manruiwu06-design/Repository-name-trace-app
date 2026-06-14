@@ -25,6 +25,7 @@ type ItineraryItem = {
   title: string;
   category: string | null;
   notes: string | null;
+  image_url: string | null;
   created_at: string;
 };
 
@@ -77,8 +78,15 @@ export default function TripDetailPage() {
     notes: "",
   });
 
+  const [selectedItineraryImage, setSelectedItineraryImage] =
+    useState<File | null>(null);
+  const [addImageInputKey, setAddImageInputKey] = useState(0);
+
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItineraryImageFile, setEditItineraryImageFile] =
+    useState<File | null>(null);
+  const [editImageInputKey, setEditImageInputKey] = useState(0);
 
   const [editItemForm, setEditItemForm] = useState({
     dayNumber: "1",
@@ -86,6 +94,7 @@ export default function TripDetailPage() {
     title: "",
     category: "景点",
     notes: "",
+    imageUrl: "",
   });
 
   const [expenseFilter, setExpenseFilter] = useState("全部");
@@ -176,6 +185,34 @@ export default function TripDetailPage() {
     setExpenses(data || []);
   }
 
+  async function uploadItineraryImage(file: File) {
+    if (!userId) {
+      alert("请先登录");
+      return null;
+    }
+
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    const filePath = `${userId}/${id}/${Date.now()}-${safeFileName}`;
+
+    const { error } = await supabase.storage
+      .from("trip-images")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      alert(error.message);
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from("trip-images")
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  }
+
   function openEditModal() {
     if (!trip) return;
 
@@ -238,6 +275,16 @@ export default function TripDetailPage() {
       return;
     }
 
+    let imageUrl: string | null = null;
+
+    if (selectedItineraryImage) {
+      imageUrl = await uploadItineraryImage(selectedItineraryImage);
+
+      if (!imageUrl) {
+        return;
+      }
+    }
+
     const { error } = await supabase.from("itinerary_items").insert([
       {
         trip_id: id,
@@ -246,6 +293,7 @@ export default function TripDetailPage() {
         title: form.title,
         category: form.category || "景点",
         notes: form.notes || null,
+        image_url: imageUrl,
       },
     ]);
 
@@ -262,6 +310,9 @@ export default function TripDetailPage() {
       notes: "",
     });
 
+    setSelectedItineraryImage(null);
+    setAddImageInputKey((prev) => prev + 1);
+
     fetchItineraryItems();
   }
 
@@ -274,8 +325,11 @@ export default function TripDetailPage() {
       title: item.title || "",
       category: item.category || "景点",
       notes: item.notes || "",
+      imageUrl: item.image_url || "",
     });
 
+    setEditItineraryImageFile(null);
+    setEditImageInputKey((prev) => prev + 1);
     setShowEditItemModal(true);
   }
 
@@ -290,6 +344,20 @@ export default function TripDetailPage() {
       return;
     }
 
+    let finalImageUrl = editItemForm.imageUrl || null;
+
+    if (editItineraryImageFile) {
+      const uploadedImageUrl = await uploadItineraryImage(
+        editItineraryImageFile
+      );
+
+      if (!uploadedImageUrl) {
+        return;
+      }
+
+      finalImageUrl = uploadedImageUrl;
+    }
+
     const { error } = await supabase
       .from("itinerary_items")
       .update({
@@ -298,6 +366,7 @@ export default function TripDetailPage() {
         title: editItemForm.title,
         category: editItemForm.category || "景点",
         notes: editItemForm.notes || null,
+        image_url: finalImageUrl,
       })
       .eq("id", editingItemId)
       .eq("trip_id", id);
@@ -309,6 +378,8 @@ export default function TripDetailPage() {
 
     setShowEditItemModal(false);
     setEditingItemId(null);
+    setEditItineraryImageFile(null);
+    setEditImageInputKey((prev) => prev + 1);
 
     setEditItemForm({
       dayNumber: "1",
@@ -316,6 +387,7 @@ export default function TripDetailPage() {
       title: "",
       category: "景点",
       notes: "",
+      imageUrl: "",
     });
 
     fetchItineraryItems();
@@ -495,7 +567,7 @@ export default function TripDetailPage() {
 
   if (loading) {
     return (
-      <main className="p-8 text-white">
+      <main className="p-4 text-white sm:p-8">
         <p className="text-zinc-400">正在加载旅行详情...</p>
       </main>
     );
@@ -503,7 +575,7 @@ export default function TripDetailPage() {
 
   if (!trip) {
     return (
-      <main className="p-8 text-white">
+      <main className="p-4 text-white sm:p-8">
         <h1 className="text-3xl font-bold">未找到旅行</h1>
 
         <p className="text-zinc-400 mt-3">
@@ -518,15 +590,15 @@ export default function TripDetailPage() {
   }
 
   return (
-    <main className="p-8 text-white">
+    <main className="p-4 text-white sm:p-8">
       <div className="mb-8">
         <Link href="/trips" className="text-sm text-cyan-400">
           ← 返回我的旅行
         </Link>
 
-        <div className="mt-4 flex items-start justify-between gap-4">
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-4xl font-bold">{trip.title}</h1>
+            <h1 className="text-3xl font-bold sm:text-4xl">{trip.title}</h1>
 
             <p className="text-zinc-400 mt-2">
               {trip.country || "未填写国家"} · {trip.city || "未填写城市"}
@@ -535,34 +607,34 @@ export default function TripDetailPage() {
 
           <button
             onClick={openEditModal}
-            className="rounded-xl bg-zinc-800 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-700"
+            className="w-fit rounded-xl bg-zinc-800 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-700"
           >
             编辑旅行
           </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-4 gap-6 mb-8">
-        <div className="rounded-2xl bg-zinc-900 p-6">
+      <div className="grid gap-4 mb-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+        <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
           <p className="text-zinc-400">国家</p>
           <h2 className="text-2xl font-bold mt-2">
             {trip.country || "未填写"}
           </h2>
         </div>
 
-        <div className="rounded-2xl bg-zinc-900 p-6">
+        <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
           <p className="text-zinc-400">城市</p>
           <h2 className="text-2xl font-bold mt-2">{trip.city || "未填写"}</h2>
         </div>
 
-        <div className="rounded-2xl bg-zinc-900 p-6">
+        <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
           <p className="text-zinc-400">预算</p>
           <h2 className="text-2xl font-bold mt-2">
             {trip.budget ? `¥${trip.budget}` : "未填写"}
           </h2>
         </div>
 
-        <div className="rounded-2xl bg-zinc-900 p-6">
+        <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
           <p className="text-zinc-400">时间</p>
           <h2 className="text-lg font-bold mt-2">
             {trip.start_date || "未填写"} - {trip.end_date || "未填写"}
@@ -570,11 +642,11 @@ export default function TripDetailPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl bg-zinc-900 p-6">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6 lg:col-span-2">
           <h2 className="text-xl font-semibold mb-4">每日行程</h2>
 
-          <div className="grid md:grid-cols-5 gap-3 mb-6">
+          <div className="grid gap-3 mb-6 md:grid-cols-5">
             <input
               placeholder="第几天"
               value={form.dayNumber}
@@ -595,7 +667,7 @@ export default function TripDetailPage() {
               placeholder="行程名称"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="md:col-span-2 rounded-xl bg-zinc-800 px-4 py-3 outline-none"
+              className="rounded-xl bg-zinc-800 px-4 py-3 outline-none md:col-span-2"
             />
 
             <select
@@ -620,6 +692,28 @@ export default function TripDetailPage() {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             className="mb-4 w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
           />
+
+          <div className="mb-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-4">
+            <p className="mb-3 text-sm text-zinc-400">
+              上传行程图片，可作为旅行记录
+            </p>
+
+            <input
+              key={addImageInputKey}
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                setSelectedItineraryImage(e.target.files?.[0] || null)
+              }
+              className="w-full text-sm text-zinc-400 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-black"
+            />
+
+            {selectedItineraryImage && (
+              <p className="mt-3 text-xs text-cyan-400">
+                已选择：{selectedItineraryImage.name}
+              </p>
+            )}
+          </div>
 
           <button
             onClick={addItineraryItem}
@@ -648,37 +742,49 @@ export default function TripDetailPage() {
                     {dayItems.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-xl bg-zinc-800 p-4 flex justify-between gap-4"
+                        className="rounded-xl bg-zinc-800 p-4"
                       >
-                        <div>
-                          <p className="text-sm text-cyan-400">
-                            {item.time || "未填写时间"} ·{" "}
-                            {item.category || "其他"}
-                          </p>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-cyan-400">
+                              {item.time || "未填写时间"} ·{" "}
+                              {item.category || "其他"}
+                            </p>
 
-                          <h3 className="text-lg font-semibold mt-1">
-                            {item.title}
-                          </h3>
+                            <h3 className="text-lg font-semibold mt-1">
+                              {item.title}
+                            </h3>
 
-                          {item.notes && (
-                            <p className="text-zinc-400 mt-2">{item.notes}</p>
-                          )}
-                        </div>
+                            {item.notes && (
+                              <p className="text-zinc-400 mt-2">
+                                {item.notes}
+                              </p>
+                            )}
 
-                        <div className="flex h-fit gap-2">
-                          <button
-                            onClick={() => openEditItineraryModal(item)}
-                            className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
-                          >
-                            编辑
-                          </button>
+                            {item.image_url && (
+                              <img
+                                src={item.image_url}
+                                alt={`${item.title} 的行程图片`}
+                                className="mt-4 h-28 w-full max-w-[260px] rounded-xl border border-zinc-700 object-cover sm:h-32 sm:max-w-xs md:h-36"
+                              />
+                            )}
+                          </div>
 
-                          <button
-                            onClick={() => deleteItineraryItem(item.id)}
-                            className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
-                          >
-                            删除
-                          </button>
+                          <div className="flex h-fit shrink-0 gap-2">
+                            <button
+                              onClick={() => openEditItineraryModal(item)}
+                              className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
+                            >
+                              编辑
+                            </button>
+
+                            <button
+                              onClick={() => deleteItineraryItem(item.id)}
+                              className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                            >
+                              删除
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -690,7 +796,7 @@ export default function TripDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl bg-zinc-900 p-6">
+          <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
             <h2 className="text-xl font-semibold mb-4">预算统计</h2>
 
             <div className="space-y-3 text-zinc-300">
@@ -709,7 +815,7 @@ export default function TripDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-zinc-900 p-6">
+          <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
             <h2 className="text-xl font-semibold mb-4">费用分类汇总</h2>
 
             {expenseCategoryEntries.length === 0 ? (
@@ -745,7 +851,7 @@ export default function TripDetailPage() {
             )}
           </div>
 
-          <div className="rounded-2xl bg-zinc-900 p-6">
+          <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
             <h2 className="text-xl font-semibold mb-4">添加费用</h2>
 
             <div className="space-y-3">
@@ -800,7 +906,7 @@ export default function TripDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-zinc-900 p-6">
+          <div className="rounded-2xl bg-zinc-900 p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">费用记录</h2>
 
@@ -834,38 +940,40 @@ export default function TripDetailPage() {
                 filteredExpenses.map((expense) => (
                   <div
                     key={expense.id}
-                    className="rounded-xl bg-zinc-800 p-4 flex justify-between gap-4"
+                    className="rounded-xl bg-zinc-800 p-4"
                   >
-                    <div>
-                      <p className="text-sm text-cyan-400">
-                        {expense.category || "其他"}
-                      </p>
-
-                      <h3 className="text-lg font-semibold mt-1">
-                        ¥{expense.amount}
-                      </h3>
-
-                      {expense.description && (
-                        <p className="text-zinc-400 mt-1">
-                          {expense.description}
+                    <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+                      <div>
+                        <p className="text-sm text-cyan-400">
+                          {expense.category || "其他"}
                         </p>
-                      )}
-                    </div>
 
-                    <div className="flex h-fit gap-2">
-                      <button
-                        onClick={() => openEditExpenseModal(expense)}
-                        className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
-                      >
-                        编辑
-                      </button>
+                        <h3 className="text-lg font-semibold mt-1">
+                          ¥{expense.amount}
+                        </h3>
 
-                      <button
-                        onClick={() => deleteExpense(expense.id)}
-                        className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
-                      >
-                        删除
-                      </button>
+                        {expense.description && (
+                          <p className="text-zinc-400 mt-1">
+                            {expense.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex h-fit gap-2">
+                        <button
+                          onClick={() => openEditExpenseModal(expense)}
+                          className="rounded-lg bg-cyan-500/10 px-3 py-2 text-sm text-cyan-400 hover:bg-cyan-500/20"
+                        >
+                          编辑
+                        </button>
+
+                        <button
+                          onClick={() => deleteExpense(expense.id)}
+                          className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                        >
+                          删除
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -876,7 +984,7 @@ export default function TripDetailPage() {
       </div>
 
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-xl rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
             <h2 className="text-2xl font-bold mb-6">编辑旅行信息</h2>
 
@@ -890,7 +998,7 @@ export default function TripDetailPage() {
                 className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <input
                   placeholder="国家"
                   value={editForm.country}
@@ -919,7 +1027,7 @@ export default function TripDetailPage() {
                 className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <input
                   type="date"
                   value={editForm.startDate}
@@ -966,12 +1074,12 @@ export default function TripDetailPage() {
       )}
 
       {showEditItemModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="w-full max-w-xl rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
             <h2 className="text-2xl font-bold mb-6">编辑每日行程</h2>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <input
                   placeholder="第几天"
                   value={editItemForm.dayNumber}
@@ -1038,6 +1146,54 @@ export default function TripDetailPage() {
                 }
                 className="w-full rounded-xl bg-zinc-800 px-4 py-3 outline-none"
               />
+
+              {editItemForm.imageUrl && (
+                <div>
+                  <p className="mb-2 text-sm text-zinc-400">当前图片</p>
+
+                  <img
+                    src={editItemForm.imageUrl}
+                    alt="当前行程图片"
+                    className="h-32 w-full max-w-xs rounded-xl border border-zinc-700 object-cover sm:h-36"
+                  />
+                </div>
+              )}
+
+              <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-4">
+                <p className="mb-3 text-sm text-zinc-400">更换行程图片</p>
+
+                <input
+                  key={editImageInputKey}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setEditItineraryImageFile(e.target.files?.[0] || null)
+                  }
+                  className="w-full text-sm text-zinc-400 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-black"
+                />
+
+                {editItineraryImageFile && (
+                  <p className="mt-3 text-xs text-cyan-400">
+                    已选择新图片：{editItineraryImageFile.name}
+                  </p>
+                )}
+
+                {(editItemForm.imageUrl || editItineraryImageFile) && (
+                  <button
+                    onClick={() => {
+                      setEditItemForm({
+                        ...editItemForm,
+                        imageUrl: "",
+                      });
+                      setEditItineraryImageFile(null);
+                      setEditImageInputKey((prev) => prev + 1);
+                    }}
+                    className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                  >
+                    移除图片
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
@@ -1045,6 +1201,8 @@ export default function TripDetailPage() {
                 onClick={() => {
                   setShowEditItemModal(false);
                   setEditingItemId(null);
+                  setEditItineraryImageFile(null);
+                  setEditImageInputKey((prev) => prev + 1);
                 }}
                 className="px-5 py-3 rounded-xl bg-zinc-800"
               >
@@ -1063,7 +1221,7 @@ export default function TripDetailPage() {
       )}
 
       {showEditExpenseModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-xl rounded-2xl bg-zinc-900 p-6 border border-zinc-800">
             <h2 className="text-2xl font-bold mb-6">编辑费用记录</h2>
 
