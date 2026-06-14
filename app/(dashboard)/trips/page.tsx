@@ -18,6 +18,16 @@ type Trip = {
   end_date?: string | null;
 };
 
+type TripStatus = "全部" | "未开始" | "旅行中" | "已完成" | "待完善";
+
+const statusOptions: TripStatus[] = [
+  "全部",
+  "未开始",
+  "旅行中",
+  "已完成",
+  "待完善",
+];
+
 function getTripStatus(startDate?: string | null, endDate?: string | null) {
   if (!startDate || !endDate) {
     return "待完善";
@@ -63,6 +73,7 @@ export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<TripStatus>("全部");
 
   const [form, setForm] = useState({
     title: "",
@@ -145,6 +156,7 @@ export default function TripsPage() {
     });
 
     setShowModal(false);
+    setSelectedStatus("全部");
     fetchTrips(userId);
   }
 
@@ -170,6 +182,26 @@ export default function TripsPage() {
     fetchTrips(userId);
   }
 
+  function getStatusCount(status: TripStatus) {
+    if (status === "全部") {
+      return trips.length;
+    }
+
+    return trips.filter((trip) => {
+      const tripStatus = getTripStatus(trip.start_date, trip.end_date);
+      return tripStatus === status;
+    }).length;
+  }
+
+  const filteredTrips = trips.filter((trip) => {
+    if (selectedStatus === "全部") {
+      return true;
+    }
+
+    const tripStatus = getTripStatus(trip.start_date, trip.end_date);
+    return tripStatus === selectedStatus;
+  });
+
   return (
     <main className="p-8 text-white">
       <div className="flex justify-between items-center mb-8">
@@ -186,19 +218,49 @@ export default function TripsPage() {
         </button>
       </div>
 
+      <div className="mb-8 flex flex-wrap gap-3">
+        {statusOptions.map((status) => {
+          const isActive = selectedStatus === status;
+
+          return (
+            <button
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={
+                isActive
+                  ? "rounded-full bg-cyan-500 px-5 py-2 text-sm font-semibold text-black"
+                  : "rounded-full bg-zinc-900 px-5 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              }
+            >
+              {status}
+              <span
+                className={
+                  isActive
+                    ? "ml-2 text-black/70"
+                    : "ml-2 text-zinc-500"
+                }
+              >
+                {getStatusCount(status)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
         <p className="text-zinc-400">正在加载旅行数据...</p>
       ) : (
         <div className="grid lg:grid-cols-3 gap-6">
-          {trips.length === 0 ? (
+          {filteredTrips.length === 0 ? (
             <div className="rounded-2xl bg-zinc-900 p-6">
-              <h2 className="text-xl font-semibold">还没有旅行</h2>
+              <h2 className="text-xl font-semibold">暂无对应旅行</h2>
+
               <p className="text-zinc-400 mt-2">
-                点击右上角「新建旅行」开始记录你的第一趟旅行。
+                当前筛选条件下没有旅行记录。
               </p>
             </div>
           ) : (
-            trips.map((trip) => {
+            filteredTrips.map((trip) => {
               const status = getTripStatus(trip.start_date, trip.end_date);
 
               return (
