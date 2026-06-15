@@ -101,6 +101,30 @@ function getStatusClass(status: TripStatus) {
   return "bg-zinc-700/50 text-zinc-300 border-zinc-600";
 }
 
+function getCategoryClass(category: string | null) {
+  if (category === "美食") {
+    return "bg-orange-500/15 text-orange-300 border-orange-500/30";
+  }
+
+  if (category === "住宿") {
+    return "bg-blue-500/15 text-blue-300 border-blue-500/30";
+  }
+
+  if (category === "交通") {
+    return "bg-violet-500/15 text-violet-300 border-violet-500/30";
+  }
+
+  if (category === "购物") {
+    return "bg-pink-500/15 text-pink-300 border-pink-500/30";
+  }
+
+  if (category === "景点") {
+    return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30";
+  }
+
+  return "bg-zinc-700/50 text-zinc-300 border-zinc-600";
+}
+
 function formatMoney(value: number | string | null | undefined) {
   return `¥${Number(value || 0).toLocaleString("zh-CN")}`;
 }
@@ -560,7 +584,7 @@ export default function TripDetailPage() {
     budget > 0 ? Math.min(Math.round((totalSpent / budget) * 100), 100) : 0;
 
   const coverImageUrl = items.find((item) => item.image_url)?.image_url || null;
-  const photoWallItems = items.filter((item) => item.image_url);
+  const itineraryImageItems = items.filter((item) => item.image_url);
 
   const filteredItems =
     itineraryFilter === "全部"
@@ -715,17 +739,15 @@ export default function TripDetailPage() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur">
-                <p className="text-xs text-zinc-400">旅行照片</p>
+                <p className="text-xs text-zinc-400">行程图片</p>
                 <p className="mt-2 text-2xl font-bold text-cyan-300">
-                  {photoWallItems.length}
+                  {itineraryImageItems.length}
                 </p>
               </div>
             </div>
           </div>
         </div>
       </section>
-
-      
 
       <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
         <div className="space-y-6">
@@ -808,9 +830,9 @@ export default function TripDetailPage() {
           <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold">每日行程</h2>
+                <h2 className="text-xl font-semibold">每日行程时间线</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  按天自动分组展示你的旅行计划，也可以按类型快速筛选。
+                  按天和时间记录旅行轨迹，也可以按类型快速筛选。
                 </p>
               </div>
 
@@ -844,85 +866,122 @@ export default function TripDetailPage() {
                 当前分类暂无行程。
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {groupedItemEntries.map(([day, dayItems]) => (
-                  <div key={day}>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-cyan-300">
-                        第 {day} 天
-                      </h3>
+                  <div key={day} className="rounded-3xl bg-zinc-950/50 p-4">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.3em] text-cyan-400">
+                          DAY {day}
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black">
+                          第 {day} 天
+                        </h3>
+                      </div>
 
-                      <span className="text-xs text-zinc-500">
+                      <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-400">
                         {dayItems.length} 个行程
                       </span>
                     </div>
 
-                    <div className="space-y-3">
-                      {dayItems.map((item) => (
+                    <div className="relative border-l border-cyan-500/20 pl-5 sm:pl-7">
+                      {dayItems.map((item, index) => (
                         <div
                           key={item.id}
-                          className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4"
+                          className={`relative ${
+                            index === dayItems.length - 1 ? "pb-0" : "pb-5"
+                          }`}
                         >
-                          <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
-                            <div>
-                              {item.image_url ? (
-                                <button
-                                  onClick={() =>
-                                    setPreviewImage({
-                                      url: item.image_url as string,
-                                      title: item.title,
-                                    })
-                                  }
-                                  className="aspect-square w-full overflow-hidden rounded-2xl bg-zinc-900"
-                                >
-                                  <img
-                                    src={item.image_url}
-                                    alt={item.title}
-                                    className="h-full w-full object-cover transition hover:scale-105"
-                                  />
-                                </button>
-                              ) : (
-                                <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-zinc-900 text-xs text-zinc-600">
-                                  暂无图片
-                                </div>
-                              )}
-                            </div>
+                          <span className="absolute -left-[29px] top-2 h-4 w-4 rounded-full border-2 border-cyan-300 bg-zinc-950 shadow-[0_0_20px_rgba(34,211,238,0.7)] sm:-left-[35px]" />
 
-                            <div>
-                              <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-h-[150px] rounded-3xl border border-zinc-800 bg-zinc-900/90 p-4 transition hover:border-cyan-500/40">
+                            <div className="grid grid-cols-[1fr_120px] gap-4 sm:grid-cols-[1fr_150px]">
+                              <div className="flex min-h-[118px] flex-col justify-between">
                                 <div>
-                                  <p className="text-sm text-zinc-500">
-                                    {item.time || "未填写时间"} ·{" "}
-                                    {item.category || "其他"}
-                                  </p>
+                                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-full bg-cyan-500 px-3 py-1 text-xs font-black text-black">
+                                          {item.time || "未填写时间"}
+                                        </span>
 
-                                  <h4 className="mt-1 text-lg font-bold">
-                                    {item.title}
-                                  </h4>
-                                </div>
+                                        <span
+                                          className={`rounded-full border px-3 py-1 text-xs font-medium ${getCategoryClass(
+                                            item.category
+                                          )}`}
+                                        >
+                                          {item.category || "其他"}
+                                        </span>
+                                      </div>
 
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => startEditItem(item)}
-                                    className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
-                                  >
-                                    编辑
-                                  </button>
+                                      <h4 className="mt-3 line-clamp-1 text-2xl font-bold">
+                                        {item.title}
+                                      </h4>
+                                    </div>
 
-                                  <button
-                                    onClick={() => deleteItineraryItem(item.id)}
-                                    className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
-                                  >
-                                    删除
-                                  </button>
+                                    <div className="flex shrink-0 gap-2">
+                                      <button
+                                        onClick={() => startEditItem(item)}
+                                        className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
+                                      >
+                                        编辑
+                                      </button>
+
+                                      <button
+                                        onClick={() =>
+                                          deleteItineraryItem(item.id)
+                                        }
+                                        className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20"
+                                      >
+                                        删除
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {item.notes ? (
+                                    <p className="line-clamp-2 rounded-2xl bg-zinc-950/70 p-3 text-sm leading-6 text-zinc-300">
+                                      {item.notes}
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm text-zinc-600">
+                                      暂无备注。
+                                    </p>
+                                  )}
                                 </div>
                               </div>
 
-                              {item.notes && (
-                                <p className="mt-3 text-sm leading-6 text-zinc-400">
-                                  {item.notes}
-                                </p>
-                              )}
+                              <div className="h-[118px] overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
+                                {item.image_url ? (
+                                  <button
+                                    onClick={() =>
+                                      setPreviewImage({
+                                        url: item.image_url as string,
+                                        title: item.title,
+                                      })
+                                    }
+                                    className="group relative block h-full w-full"
+                                  >
+                                    <img
+                                      src={item.image_url}
+                                      alt={item.title}
+                                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                    />
+
+                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2 text-left">
+                                      <p className="text-xs text-zinc-300">
+                                        点击查看大图
+                                      </p>
+                                    </div>
+                                  </button>
+                                ) : (
+                                  <div className="flex h-full w-full flex-col items-center justify-center text-xs text-zinc-600">
+                                    <span className="text-lg font-bold text-zinc-500">
+                                      T
+                                    </span>
+                                    <span className="mt-1">暂无图片</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
