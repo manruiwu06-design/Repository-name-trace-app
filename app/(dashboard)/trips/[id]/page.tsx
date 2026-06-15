@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -145,6 +145,16 @@ export default function TripDetailPage() {
     "其他",
   ];
 
+  const itineraryFilterOptions = [
+    "全部",
+    "景点",
+    "美食",
+    "住宿",
+    "交通",
+    "购物",
+    "其他",
+  ];
+
   const expenseFilterOptions = [
     "全部",
     "餐饮",
@@ -182,6 +192,7 @@ export default function TripDetailPage() {
     useState<EditingExpenseForm | null>(null);
 
   const [expenseFilter, setExpenseFilter] = useState("全部");
+  const [itineraryFilter, setItineraryFilter] = useState("全部");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewImage, setPreviewImage] = useState<{
     url: string;
@@ -377,6 +388,7 @@ export default function TripDetailPage() {
       }
 
       setItemForm(getDefaultItineraryForm());
+      setItineraryFilter("全部");
       await refreshData();
     } catch (error) {
       alert(error instanceof Error ? error.message : "图片上传失败");
@@ -550,7 +562,12 @@ export default function TripDetailPage() {
   const coverImageUrl = items.find((item) => item.image_url)?.image_url || null;
   const photoWallItems = items.filter((item) => item.image_url);
 
-  const groupedItems = items.reduce<Record<number, ItineraryItem[]>>(
+  const filteredItems =
+    itineraryFilter === "全部"
+      ? items
+      : items.filter((item) => (item.category || "其他") === itineraryFilter);
+
+  const groupedItems = filteredItems.reduce<Record<number, ItineraryItem[]>>(
     (groups, item) => {
       const day = item.day_number || 1;
 
@@ -708,52 +725,7 @@ export default function TripDetailPage() {
         </div>
       </section>
 
-      {photoWallItems.length > 0 && (
-        <section className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">旅行照片墙</h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                自动汇总这趟旅行中所有带图片的行程。
-              </p>
-            </div>
-
-            <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-400">
-              {photoWallItems.length} 张
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {photoWallItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() =>
-                  setPreviewImage({
-                    url: item.image_url as string,
-                    title: item.title,
-                  })
-                }
-                className="group relative aspect-square overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950"
-              >
-                <img
-                  src={item.image_url as string}
-                  alt={item.title}
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                />
-
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 text-left">
-                  <p className="truncate text-sm font-semibold">
-                    {item.title}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    第 {item.day_number || 1} 天
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      
 
       <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
         <div className="space-y-6">
@@ -834,22 +806,42 @@ export default function TripDetailPage() {
           </div>
 
           <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
-            <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">每日行程</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  按天自动分组展示你的旅行计划。
+                  按天自动分组展示你的旅行计划，也可以按类型快速筛选。
                 </p>
               </div>
 
               <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-400">
-                {items.length} 个行程
+                {filteredItems.length} / {items.length} 个行程
               </span>
             </div>
 
-            {groupedItemEntries.length === 0 ? (
+            <div className="mb-6 flex flex-wrap gap-2">
+              {itineraryFilterOptions.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setItineraryFilter(option)}
+                  className={`rounded-full px-3 py-2 text-xs font-medium transition ${
+                    itineraryFilter === option
+                      ? "bg-cyan-500 text-black"
+                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+
+            {items.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center text-sm text-zinc-500">
                 还没有添加行程。
+              </div>
+            ) : groupedItemEntries.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center text-sm text-zinc-500">
+                当前分类暂无行程。
               </div>
             ) : (
               <div className="space-y-6">
