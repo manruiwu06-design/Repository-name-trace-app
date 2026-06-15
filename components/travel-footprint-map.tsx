@@ -9,6 +9,7 @@ export type FootprintCity = {
   count: number;
   latestTripId: string;
   latestTripTitle: string;
+  coverImageUrl?: string | null;
 };
 
 type MapPoint = FootprintCity & {
@@ -103,7 +104,7 @@ export default function TravelFootprintMap({
       const amapSecurityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
 
       if (!amapKey || !amapSecurityCode) {
-        setMapError("缺少高德地图 Key 或安全密钥，请检查 .env.local。");
+        setMapError("缺少高德地图 Key 或安全密钥，请检查环境变量。");
         setMapLoading(false);
         return;
       }
@@ -151,8 +152,9 @@ export default function TravelFootprintMap({
 
         mapRef.current = map;
         infoWindowRef.current = new AMap.InfoWindow({
-          offset: new AMap.Pixel(0, -34),
+          offset: new AMap.Pixel(0, -36),
           closeWhenClickMap: true,
+          isCustom: true,
         });
 
         const geocoder = new AMap.Geocoder({
@@ -243,7 +245,7 @@ export default function TravelFootprintMap({
         setFailedCities(failed);
       } catch (error) {
         console.error(error);
-        setMapError("高德地图加载失败，请检查 Key、安全密钥和网络。");
+        setMapError("高德地图加载失败，请检查 Key、安全密钥、域名白名单和网络。");
       } finally {
         if (!cancelled) {
           setMapLoading(false);
@@ -263,25 +265,53 @@ export default function TravelFootprintMap({
     };
   }, [uniqueCities]);
 
+  function getInfoWindowContent(point: MapPoint) {
+    const coverHtml = point.coverImageUrl
+      ? `
+        <img
+          class="trace-map-card-image"
+          src="${escapeHtml(point.coverImageUrl)}"
+          alt="${escapeHtml(point.latestTripTitle)}"
+        />
+      `
+      : `
+        <div class="trace-map-card-placeholder">
+          <div class="trace-map-card-logo">T</div>
+          <div class="trace-map-card-placeholder-text">暂无旅行照片</div>
+        </div>
+      `;
+
+    return `
+      <div class="trace-map-card">
+        <div class="trace-map-card-cover">
+          ${coverHtml}
+          <div class="trace-map-card-gradient"></div>
+          <div class="trace-map-card-badge">${point.count} 趟旅行</div>
+        </div>
+
+        <div class="trace-map-card-body">
+          <div class="trace-map-card-country">${escapeHtml(point.country)}</div>
+          <div class="trace-map-card-city">${escapeHtml(point.city)}</div>
+
+          <div class="trace-map-card-trip">
+            最近旅行：${escapeHtml(point.latestTripTitle)}
+          </div>
+
+          <a class="trace-map-card-link" href="/trips/${point.latestTripId}">
+            查看旅行详情
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
   function openInfoWindow(point: MapPoint) {
     if (!mapRef.current || !infoWindowRef.current) return;
 
     const key = getCityKey(point);
     setSelectedKey(key);
 
-    infoWindowRef.current.setContent(`
-      <div class="trace-map-info">
-        <div class="trace-map-info-country">${escapeHtml(point.country)}</div>
-        <div class="trace-map-info-city">${escapeHtml(point.city)}</div>
-        <div class="trace-map-info-desc">${point.count} 趟旅行 · 最近：${escapeHtml(
-          point.latestTripTitle
-        )}</div>
-        <a class="trace-map-info-link" href="/trips/${point.latestTripId}">
-          查看旅行详情
-        </a>
-      </div>
-    `);
-
+    infoWindowRef.current.setContent(getInfoWindowContent(point));
     infoWindowRef.current.open(mapRef.current, [point.lng, point.lat]);
     mapRef.current.setZoomAndCenter(7, [point.lng, point.lat]);
   }
@@ -346,28 +376,48 @@ export default function TravelFootprintMap({
                   <button
                     key={key}
                     onClick={() => openInfoWindow(point)}
-                    className={`w-full rounded-2xl border p-4 text-left transition ${
+                    className={`w-full rounded-2xl border p-3 text-left transition ${
                       active
                         ? "border-cyan-400 bg-cyan-500/10"
                         : "border-zinc-800 bg-zinc-950 hover:border-cyan-500/40"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs text-zinc-500">
-                          {point.country}
-                        </p>
-                        <p className="mt-1 text-lg font-bold">{point.city}</p>
+                    <div className="flex gap-3">
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-900">
+                        {point.coverImageUrl ? (
+                          <img
+                            src={point.coverImageUrl}
+                            alt={point.latestTripTitle}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-sm font-bold text-cyan-300">
+                            T
+                          </div>
+                        )}
                       </div>
 
-                      <span className="rounded-full bg-cyan-500/15 px-3 py-1 text-xs text-cyan-300">
-                        {point.count} 趟
-                      </span>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs text-zinc-500">
+                              {point.country}
+                            </p>
+                            <p className="mt-1 truncate text-lg font-bold">
+                              {point.city}
+                            </p>
+                          </div>
 
-                    <p className="mt-3 line-clamp-1 text-xs text-zinc-500">
-                      最近：{point.latestTripTitle}
-                    </p>
+                          <span className="shrink-0 rounded-full bg-cyan-500/15 px-3 py-1 text-xs text-cyan-300">
+                            {point.count} 趟
+                          </span>
+                        </div>
+
+                        <p className="mt-2 line-clamp-1 text-xs text-zinc-500">
+                          最近：{point.latestTripTitle}
+                        </p>
+                      </div>
+                    </div>
                   </button>
                 );
               })}
@@ -424,42 +474,116 @@ export default function TravelFootprintMap({
           box-shadow: 0 0 20px rgba(34, 211, 238, 0.95);
         }
 
-        .trace-map-info {
-          min-width: 210px;
-          border-radius: 16px;
+        .trace-map-card {
+          width: 280px;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(34, 211, 238, 0.32);
           background: #09090b;
           color: white;
-          padding: 14px;
-          border: 1px solid rgba(34, 211, 238, 0.3);
-          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+          box-shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
         }
 
-        .trace-map-info-country {
+        .trace-map-card-cover {
+          position: relative;
+          height: 140px;
+          overflow: hidden;
+          background: #18181b;
+        }
+
+        .trace-map-card-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .trace-map-card-placeholder {
+          display: flex;
+          height: 100%;
+          width: 100%;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background:
+            radial-gradient(circle at top left, rgba(34, 211, 238, 0.24), transparent 38%),
+            linear-gradient(135deg, #18181b, #09090b);
+        }
+
+        .trace-map-card-logo {
+          display: flex;
+          height: 44px;
+          width: 44px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 16px;
+          border: 1px solid rgba(34, 211, 238, 0.35);
+          background: rgba(34, 211, 238, 0.1);
+          color: #67e8f9;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .trace-map-card-placeholder-text {
+          margin-top: 10px;
           color: #71717a;
           font-size: 12px;
         }
 
-        .trace-map-info-city {
+        .trace-map-card-gradient {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to top, rgba(0, 0, 0, 0.82), transparent 58%);
+        }
+
+        .trace-map-card-badge {
+          position: absolute;
+          left: 14px;
+          top: 14px;
+          border-radius: 9999px;
+          border: 1px solid rgba(34, 211, 238, 0.35);
+          background: rgba(0, 0, 0, 0.55);
+          padding: 6px 10px;
+          color: #67e8f9;
+          font-size: 12px;
+          font-weight: 700;
+          backdrop-filter: blur(10px);
+        }
+
+        .trace-map-card-body {
+          padding: 16px;
+        }
+
+        .trace-map-card-country {
+          color: #71717a;
+          font-size: 12px;
+        }
+
+        .trace-map-card-city {
           margin-top: 4px;
-          font-size: 20px;
-          font-weight: 800;
+          font-size: 24px;
+          font-weight: 900;
+          line-height: 1.15;
         }
 
-        .trace-map-info-desc {
-          margin-top: 8px;
+        .trace-map-card-trip {
+          margin-top: 10px;
           color: #a1a1aa;
-          font-size: 12px;
+          font-size: 13px;
+          line-height: 1.45;
         }
 
-        .trace-map-info-link {
-          margin-top: 12px;
+        .trace-map-card-link {
+          margin-top: 14px;
           display: inline-flex;
-          border-radius: 12px;
+          width: 100%;
+          justify-content: center;
+          border-radius: 14px;
           background: #22d3ee;
-          padding: 8px 12px;
+          padding: 10px 14px;
           color: #020617;
-          font-size: 12px;
-          font-weight: 800;
+          font-size: 13px;
+          font-weight: 900;
           text-decoration: none;
         }
 

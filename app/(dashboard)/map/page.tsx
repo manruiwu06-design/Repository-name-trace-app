@@ -38,6 +38,7 @@ type CityFootprint = {
   trips: Trip[];
   count: number;
   latestTrip: Trip;
+  coverImageUrl?: string | null;
 };
 
 type CountryFootprint = {
@@ -167,7 +168,21 @@ export default function MapPage() {
     return map;
   }, [trips]);
 
-  const countryFootprints = useMemo<CountryFootprint[]>((() => {
+  const coverImageMap = useMemo(() => {
+    const map: Record<string, string> = {};
+
+    photos.forEach((photo) => {
+      if (!photo.image_url) return;
+
+      if (!map[photo.trip_id]) {
+        map[photo.trip_id] = photo.image_url;
+      }
+    });
+
+    return map;
+  }, [photos]);
+
+  const countryFootprints = useMemo<CountryFootprint[]>(() => {
     const countryMap: Record<string, Trip[]> = {};
 
     trips.forEach((trip) => {
@@ -208,6 +223,7 @@ export default function MapPage() {
               trips: cityTrips,
               count: cityTrips.length,
               latestTrip,
+              coverImageUrl: coverImageMap[latestTrip.id] || null,
             };
           })
           .sort((a, b) => b.count - a.count);
@@ -219,7 +235,7 @@ export default function MapPage() {
         };
       })
       .sort((a, b) => b.trips.length - a.trips.length);
-  }) as () => CountryFootprint[], [trips]);
+  }, [trips, coverImageMap]);
 
   const cityFootprints = countryFootprints
     .flatMap((country) => country.cities)
@@ -231,6 +247,7 @@ export default function MapPage() {
     count: city.count,
     latestTripId: city.latestTrip.id,
     latestTripTitle: city.latestTrip.title,
+    coverImageUrl: city.coverImageUrl || null,
   }));
 
   const countryCount = countryFootprints.length;
@@ -268,7 +285,7 @@ export default function MapPage() {
 
             <p className="mt-4 max-w-2xl text-zinc-400">
               Trace 会根据你的旅行记录，自动把去过的城市点亮在地图上。
-              每一个发光点，都是你旅行人生档案里的一段记忆。
+              点击发光点，可以看到这座城市最近一次旅行的照片卡片。
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -370,7 +387,7 @@ export default function MapPage() {
               <div>
                 <h2 className="text-xl font-semibold">足迹地图</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  去过的城市会在地图上自动点亮，点击发光点可查看最近旅行。
+                  去过的城市会自动点亮。点击发光点，可查看带封面图的旅行卡片。
                 </p>
               </div>
 
@@ -430,20 +447,38 @@ export default function MapPage() {
                           href={`/trips/${city.latestTrip.id}`}
                           className="rounded-2xl bg-zinc-900 p-4 transition hover:bg-zinc-800"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-lg font-semibold">
-                                {city.city}
-                              </p>
-
-                              <p className="mt-1 line-clamp-1 text-sm text-zinc-500">
-                                最近：{city.latestTrip.title}
-                              </p>
+                          <div className="flex gap-3">
+                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
+                              {city.coverImageUrl ? (
+                                <img
+                                  src={city.coverImageUrl}
+                                  alt={city.latestTrip.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center font-bold text-cyan-300">
+                                  T
+                                </div>
+                              )}
                             </div>
 
-                            <span className="rounded-full bg-cyan-500/15 px-3 py-1 text-xs text-cyan-300">
-                              {city.count} 趟
-                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-lg font-semibold">
+                                    {city.city}
+                                  </p>
+
+                                  <p className="mt-1 line-clamp-1 text-sm text-zinc-500">
+                                    最近：{city.latestTrip.title}
+                                  </p>
+                                </div>
+
+                                <span className="shrink-0 rounded-full bg-cyan-500/15 px-3 py-1 text-xs text-cyan-300">
+                                  {city.count} 趟
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </Link>
                       ))}
