@@ -796,13 +796,43 @@ export default function TripDetailPage() {
             </div>
 
             {items.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center text-sm text-zinc-500">
-                还没有添加行程。点击右上角「＋ 添加行程」开始记录。
-              </div>
-            ) : groupedItemEntries.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center text-sm text-zinc-500">
-                当前分类暂无行程。
-              </div>
+  <div className="rounded-3xl border border-dashed border-cyan-500/25 bg-cyan-500/5 p-8 text-center">
+    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
+      ✈️
+    </div>
+
+    <h3 className="mt-5 text-xl font-bold text-white">还没有行程记录</h3>
+
+    <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
+      把每天要去的地点、美食、住宿和交通安排记录下来，这趟旅行就会变成完整的时间线档案。
+    </p>
+
+    <button
+      onClick={() => setShowAddItineraryModal(true)}
+      className="mt-6 rounded-full bg-cyan-500 px-5 py-3 text-sm font-black text-black hover:bg-cyan-400"
+    >
+      ＋ 添加第一条行程
+    </button>
+  </div>
+) : groupedItemEntries.length === 0 ? (
+  <div className="rounded-3xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center">
+  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800 text-xl">
+    🔎
+  </div>
+
+  <h3 className="mt-4 text-lg font-bold text-white">当前分类暂无行程</h3>
+
+  <p className="mt-2 text-sm text-zinc-500">
+    可以切换上方分类，或者添加一条新的行程记录。
+  </p>
+
+  <button
+    onClick={() => setShowAddItineraryModal(true)}
+    className="mt-5 rounded-full bg-zinc-800 px-5 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-700"
+  >
+    ＋ 添加行程
+  </button>
+</div>
             ) : (
               <div className="space-y-8">
                 {groupedItemEntries.map(([day, dayItems]) => (
@@ -987,7 +1017,17 @@ export default function TripDetailPage() {
             <h2 className="text-xl font-semibold">费用分类汇总</h2>
 
             {expenseCategorySummary.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500">还没有费用记录。</p>
+              <div className="mt-5 rounded-3xl border border-dashed border-zinc-800 bg-black/20 p-6 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800 text-xl">
+                💳
+              </div>
+            
+              <h3 className="mt-4 text-lg font-bold text-white">还没有费用数据</h3>
+            
+              <p className="mt-2 text-sm leading-6 text-zinc-500">
+                添加费用后，这里会自动生成餐饮、住宿、交通等分类占比。
+              </p>
+            </div>
             ) : (
               <div className="mt-5 space-y-4">
                 {expenseCategorySummary.map((item) => (
@@ -1046,9 +1086,26 @@ export default function TripDetailPage() {
             </div>
 
             {filteredExpenses.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center text-sm text-zinc-500">
-                当前分类暂无费用记录。点击右上角「＋ 添加费用」开始记录。
+              <div className="rounded-3xl border border-dashed border-cyan-500/25 bg-cyan-500/5 p-8 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
+                💰
               </div>
+            
+              <h3 className="mt-5 text-xl font-bold text-white">
+                {expenseFilter === "全部" ? "还没有费用记录" : "当前分类暂无费用"}
+              </h3>
+            
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
+                记录餐饮、住宿、交通和门票开销后，Trace 会帮你自动计算预算使用情况。
+              </p>
+            
+              <button
+                onClick={() => setShowAddExpenseModal(true)}
+                className="mt-6 rounded-full bg-cyan-500 px-5 py-3 text-sm font-black text-black hover:bg-cyan-400"
+              >
+                ＋ 添加费用
+              </button>
+            </div>
             ) : (
               <div className="space-y-3">
                 {filteredExpenses.map((expense) => (
