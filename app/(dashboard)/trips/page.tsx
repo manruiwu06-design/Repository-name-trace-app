@@ -3,51 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
-type Trip = {
-  id: string;
-  user_id: string | null;
-  title: string;
-  country: string | null;
-  city: string | null;
-  budget: number | string | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-  cover_image_url?: string | null;
-};
-
-type ItineraryImageItem = {
-  trip_id: string;
-  image_url: string | null;
-  day_number: number | null;
-  time: string | null;
-  created_at: string;
-};
-
-type TripStatus = "未开始" | "旅行中" | "已完成" | "待完善";
-
-function getTripStatus(trip: Trip): TripStatus {
-  if (!trip.start_date || !trip.end_date) {
-    return "待完善";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = new Date(`${trip.start_date}T00:00:00`);
-  const endDate = new Date(`${trip.end_date}T23:59:59`);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "待完善";
-  }
-
-  if (today < startDate) return "未开始";
-  if (today > endDate) return "已完成";
-
-  return "旅行中";
-}
+import {
+  createTripForCurrentUser,
+  deleteTripForCurrentUser,
+  getTripStatus,
+  getTripsWithCoversForCurrentUser,
+  type Trip,
+  type TripStatus,
+} from "@/lib/services/trips";
 
 function getStatusClass(status: TripStatus) {
   if (status === "旅行中") {
@@ -90,7 +53,13 @@ function getDefaultForm() {
 export default function TripsPage() {
   const router = useRouter();
 
-  const statusOptions = ["全部", "未开始", "旅行中", "已完成", "待完善"];
+  const statusOptions: Array<"全部" | TripStatus> = [
+    "全部",
+    "未开始",
+    "旅行中",
+    "已完成",
+    "待完善",
+  ];
 
   const [userId, setUserId] = useState<string | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -99,7 +68,7 @@ export default function TripsPage() {
   const [showModal, setShowModal] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("全部");
+  const [statusFilter, setStatusFilter] = useState<"全部" | TripStatus>("全部");
 
   const [form, setForm] = useState(getDefaultForm);
 
@@ -108,67 +77,37 @@ export default function TripsPage() {
   }, []);
 
   async function initPage() {
-    const { data } = await supabase.auth.getUser();
+    try {
+      const result = await getTripsWithCoversForCurrentUser();
 
-    if (!data.user) {
-      router.push("/");
-      return;
+      if (!result.userId) {
+        router.push("/");
+        return;
+      }
+
+      setUserId(result.userId);
+      setTrips(result.trips);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "加载旅行失败");
+    } finally {
+      setLoading(false);
     }
-
-    setUserId(data.user.id);
-    await fetchTrips(data.user.id);
-    setLoading(false);
   }
 
-  async function fetchTrips(currentUserId: string) {
-    const { data, error } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("user_id", currentUserId)
-      .order("created_at", { ascending: false });
+  async function refreshTrips() {
+    try {
+      const result = await getTripsWithCoversForCurrentUser();
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    const tripList = data || [];
-    const tripIds = tripList.map((trip) => trip.id);
-
-    if (tripIds.length === 0) {
-      setTrips([]);
-      return;
-    }
-
-    const { data: imageItems, error: imageError } = await supabase
-      .from("itinerary_items")
-      .select("trip_id, image_url, day_number, time, created_at")
-      .in("trip_id", tripIds)
-      .order("day_number", { ascending: true })
-      .order("time", { ascending: true });
-
-    if (imageError) {
-      console.error(imageError);
-      setTrips(tripList);
-      return;
-    }
-
-    const coverMap: Record<string, string> = {};
-
-    (imageItems || []).forEach((item: ItineraryImageItem) => {
-      if (!item.image_url) return;
-
-      if (!coverMap[item.trip_id]) {
-        coverMap[item.trip_id] = item.image_url;
+      if (!result.userId) {
+        router.push("/");
+        return;
       }
-    });
 
-    const tripsWithCover = tripList.map((trip) => ({
-      ...trip,
-      cover_image_url: coverMap[trip.id] || null,
-    }));
-
-    setTrips(tripsWithCover);
+      setUserId(result.userId);
+      setTrips(result.trips);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "刷新旅行失败");
+    }
   }
 
   function openCreateModal() {
@@ -193,25 +132,21 @@ export default function TripsPage() {
       return;
     }
 
-    const { error } = await supabase.from("trips").insert([
-      {
-        user_id: userId,
+    try {
+      await createTripForCurrentUser({
         title: form.title.trim(),
         country: form.country.trim() || null,
         city: form.city.trim() || null,
         budget: form.budget ? Number(form.budget) : null,
         start_date: form.startDate || null,
         end_date: form.endDate || null,
-      },
-    ]);
+      });
 
-    if (error) {
-      alert(error.message);
-      return;
+      closeCreateModal();
+      await refreshTrips();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "创建旅行失败");
     }
-
-    closeCreateModal();
-    await fetchTrips(userId);
   }
 
   async function deleteTrip(tripId: string) {
@@ -224,18 +159,12 @@ export default function TripsPage() {
 
     if (!confirmDelete) return;
 
-    const { error } = await supabase
-      .from("trips")
-      .delete()
-      .eq("id", tripId)
-      .eq("user_id", userId);
-
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      await deleteTripForCurrentUser(tripId);
+      await refreshTrips();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "删除旅行失败");
     }
-
-    await fetchTrips(userId);
   }
 
   const filteredTrips = trips.filter((trip) => {
