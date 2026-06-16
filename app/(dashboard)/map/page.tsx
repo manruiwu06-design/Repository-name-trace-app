@@ -3,34 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import {
+  getTripStatus,
+  getTripsForCurrentUser,
+  type Trip,
+  type TripStatus,
+} from "@/lib/services/trips";
+import {
+  getItineraryPhotosByTripIds,
+  type ItineraryItem,
+} from "@/lib/services/itinerary";
 import TravelFootprintMap, {
   type FootprintCity,
 } from "@/components/travel-footprint-map";
-
-type Trip = {
-  id: string;
-  user_id: string | null;
-  title: string;
-  country: string | null;
-  city: string | null;
-  budget: number | string | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-};
-
-type ItineraryPhoto = {
-  id: string;
-  trip_id: string;
-  title: string;
-  category: string | null;
-  day_number: number | null;
-  image_url: string | null;
-  created_at: string;
-};
-
-type TripStatus = "未开始" | "旅行中" | "已完成" | "待完善";
 
 type CityFootprint = {
   country: string;
@@ -46,32 +31,6 @@ type CountryFootprint = {
   trips: Trip[];
   cities: CityFootprint[];
 };
-
-function getTripStatus(trip: Trip): TripStatus {
-  if (!trip.start_date || !trip.end_date) {
-    return "待完善";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = new Date(`${trip.start_date}T00:00:00`);
-  const endDate = new Date(`${trip.end_date}T23:59:59`);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "待完善";
-  }
-
-  if (today < startDate) {
-    return "未开始";
-  }
-
-  if (today > endDate) {
-    return "已完成";
-  }
-
-  return "旅行中";
-}
 
 function getStatusClass(status: TripStatus) {
   if (status === "旅行中") {
@@ -101,7 +60,7 @@ export default function MapPage() {
   const router = useRouter();
 
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [photos, setPhotos] = useState<ItineraryPhoto[]>([]);
+  const [photos, setPhotos] = useState<ItineraryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -109,53 +68,30 @@ export default function MapPage() {
   }, []);
 
   async function initPage() {
-    const { data } = await supabase.auth.getUser();
+    try {
+      const { userId, trips: tripList } = await getTripsForCurrentUser();
 
-    if (!data.user) {
-      router.push("/");
-      return;
+      if (!userId) {
+        router.push("/");
+        return;
+      }
+
+      setTrips(tripList);
+
+      const tripIds = tripList.map((trip) => trip.id);
+
+      if (tripIds.length === 0) {
+        setPhotos([]);
+        return;
+      }
+
+      const photoList = await getItineraryPhotosByTripIds(tripIds);
+      setPhotos(photoList);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "加载旅行足迹失败");
+    } finally {
+      setLoading(false);
     }
-
-    await fetchMapData(data.user.id);
-    setLoading(false);
-  }
-
-  async function fetchMapData(currentUserId: string) {
-    const { data: tripData, error: tripError } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("user_id", currentUserId)
-      .order("created_at", { ascending: false });
-
-    if (tripError) {
-      alert(tripError.message);
-      return;
-    }
-
-    const tripList = tripData || [];
-    setTrips(tripList);
-
-    const tripIds = tripList.map((trip) => trip.id);
-
-    if (tripIds.length === 0) {
-      setPhotos([]);
-      return;
-    }
-
-    const { data: photoData, error: photoError } = await supabase
-      .from("itinerary_items")
-      .select("id, trip_id, title, category, day_number, image_url, created_at")
-      .in("trip_id", tripIds)
-      .not("image_url", "is", null)
-      .order("created_at", { ascending: false });
-
-    if (photoError) {
-      console.error(photoError);
-      setPhotos([]);
-      return;
-    }
-
-    setPhotos(photoData || []);
   }
 
   const tripTitleMap = useMemo(() => {

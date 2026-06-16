@@ -134,3 +134,21 @@ export async function deleteItineraryItem(itemId: string) {
 
   return true;
 }
+export async function getItineraryPhotosByTripIds(tripIds: string[]) {
+    if (tripIds.length === 0) {
+      return [] as ItineraryItem[];
+    }
+  
+    const { data, error } = await supabase
+      .from("itinerary_items")
+      .select("*")
+      .in("trip_id", tripIds)
+      .not("image_url", "is", null)
+      .order("created_at", { ascending: false });
+  
+    if (error) {
+      throw new Error(error.message);
+    }
+  
+    return (data || []) as ItineraryItem[];
+  }
