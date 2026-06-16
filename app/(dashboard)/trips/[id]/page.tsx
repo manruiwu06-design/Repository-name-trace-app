@@ -4,6 +4,14 @@ import { useEffect, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+  createItineraryItem,
+  deleteItineraryItem as deleteItineraryItemService,
+  getItineraryItemsByTripId,
+  updateItineraryItem as updateItineraryItemService,
+  uploadItineraryImageForCurrentUser,
+  type ItineraryItem,
+} from "@/lib/services/itinerary";
 
 type Trip = {
   id: string;
@@ -17,17 +25,7 @@ type Trip = {
   created_at: string;
 };
 
-type ItineraryItem = {
-  id: string;
-  trip_id: string;
-  day_number: number | null;
-  time: string | null;
-  title: string;
-  category: string | null;
-  notes: string | null;
-  image_url: string | null;
-  created_at: string;
-};
+
 
 type Expense = {
   id: string;
@@ -265,17 +263,13 @@ export default function TripDetailPage() {
 
     setTrip(tripData);
 
-    const { data: itineraryData, error: itineraryError } = await supabase
-      .from("itinerary_items")
-      .select("*")
-      .eq("trip_id", targetTripId)
-      .order("day_number", { ascending: true })
-      .order("time", { ascending: true })
-      .order("created_at", { ascending: true });
+    let itineraryData: ItineraryItem[] = [];
 
-    if (itineraryError) {
-      console.error(itineraryError);
-    }
+try {
+  itineraryData = await getItineraryItemsByTripId(targetTripId);
+} catch (error) {
+  console.error(error);
+}
 
     const { data: expenseData, error: expenseError } = await supabase
       .from("expenses")
@@ -297,26 +291,11 @@ export default function TripDetailPage() {
   }
 
   async function uploadItineraryImage(file: File) {
-    if (!currentUserId || !tripId) {
-      throw new Error("请先登录");
+    if (!tripId) {
+      throw new Error("缺少旅行 ID");
     }
-
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, "-");
-    const filePath = `${currentUserId}/${tripId}/${Date.now()}-${safeFileName}`;
-
-    const { error } = await supabase.storage
-      .from("trip-images")
-      .upload(filePath, file);
-
-    if (error) {
-      throw error;
-    }
-
-    const { data } = supabase.storage
-      .from("trip-images")
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+  
+    return uploadItineraryImageForCurrentUser(tripId, file);
   }
 
   function openEditTripModal() {
@@ -397,22 +376,14 @@ export default function TripDetailPage() {
         imageUrl = await uploadItineraryImage(itemForm.imageFile);
       }
 
-      const { error } = await supabase.from("itinerary_items").insert([
-        {
-          trip_id: tripId,
-          day_number: Number(itemForm.dayNumber || 1),
-          time: itemForm.time || null,
-          title: itemForm.title.trim(),
-          category: itemForm.category || "其他",
-          notes: itemForm.notes.trim() || null,
-          image_url: imageUrl,
-        },
-      ]);
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
+      await createItineraryItem(tripId, {
+        day_number: Number(itemForm.dayNumber || 1),
+        time: itemForm.time || null,
+        title: itemForm.title.trim(),
+        category: itemForm.category || "其他",
+        notes: itemForm.notes.trim() || null,
+        image_url: imageUrl,
+      });
 
       setItemForm(getDefaultItineraryForm());
       setItineraryFilter("全部");
@@ -455,22 +426,14 @@ export default function TripDetailPage() {
         imageUrl = await uploadItineraryImage(editingItemForm.imageFile);
       }
 
-      const { error } = await supabase
-        .from("itinerary_items")
-        .update({
-          day_number: Number(editingItemForm.dayNumber || 1),
-          time: editingItemForm.time || null,
-          title: editingItemForm.title.trim(),
-          category: editingItemForm.category || "其他",
-          notes: editingItemForm.notes.trim() || null,
-          image_url: imageUrl,
-        })
-        .eq("id", editingItemForm.id);
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
+      await updateItineraryItemService(editingItemForm.id, {
+        day_number: Number(editingItemForm.dayNumber || 1),
+        time: editingItemForm.time || null,
+        title: editingItemForm.title.trim(),
+        category: editingItemForm.category || "其他",
+        notes: editingItemForm.notes.trim() || null,
+        image_url: imageUrl,
+      });
 
       setEditingItemForm(null);
       await refreshData();
@@ -483,20 +446,15 @@ export default function TripDetailPage() {
 
   async function deleteItineraryItem(itemId: string) {
     const confirmDelete = window.confirm("确定要删除这个行程吗？");
-
+  
     if (!confirmDelete) return;
-
-    const { error } = await supabase
-      .from("itinerary_items")
-      .delete()
-      .eq("id", itemId);
-
-    if (error) {
-      alert(error.message);
-      return;
+  
+    try {
+      await deleteItineraryItemService(itemId);
+      await refreshData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "删除行程失败");
     }
-
-    await refreshData();
   }
 
   async function addExpense() {
