@@ -3,60 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
-type Trip = {
-  id: string;
-  user_id: string | null;
-  title: string;
-  country: string | null;
-  city: string | null;
-  budget: number | string | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-  cover_image_url?: string | null;
-};
-
-type Expense = {
-  id: string;
-  trip_id: string;
-  category: string | null;
-  amount: number | string;
-  description: string | null;
-  created_at: string;
-};
-
-type CoverImageItem = {
-  trip_id: string;
-  image_url: string | null;
-  day_number: number | null;
-  time: string | null;
-  created_at: string;
-};
-
-type TripStatus = "未开始" | "旅行中" | "已完成" | "待完善";
-
-function getTripStatus(trip: Trip): TripStatus {
-  if (!trip.start_date || !trip.end_date) {
-    return "待完善";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = new Date(`${trip.start_date}T00:00:00`);
-  const endDate = new Date(`${trip.end_date}T23:59:59`);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "待完善";
-  }
-
-  if (today < startDate) return "未开始";
-  if (today > endDate) return "已完成";
-
-  return "旅行中";
-}
+import {
+  getCurrentUserId,
+  getTripStatus,
+  getTripsWithCoversForCurrentUser,
+  type Trip,
+  type TripStatus,
+} from "@/lib/services/trips";
+import {
+  getExpensesByTripIds,
+  type Expense,
+} from "@/lib/services/expenses";
 
 function getStatusClass(status: TripStatus) {
   if (status === "旅行中") {
@@ -97,30 +54,24 @@ export default function OverviewPage() {
   }, []);
 
   async function initPage() {
-    const { data } = await supabase.auth.getUser();
+    try {
+      const userId = await getCurrentUserId();
 
-    if (!data.user) {
-      router.push("/");
-      return;
+      if (!userId) {
+        router.push("/");
+        return;
+      }
+
+      await fetchOverviewData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "加载总览失败");
+    } finally {
+      setLoading(false);
     }
-
-    await fetchOverviewData(data.user.id);
-    setLoading(false);
   }
 
-  async function fetchOverviewData(currentUserId: string) {
-    const { data: tripData, error: tripError } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("user_id", currentUserId)
-      .order("created_at", { ascending: false });
-
-    if (tripError) {
-      alert(tripError.message);
-      return;
-    }
-
-    const tripList = tripData || [];
+  async function fetchOverviewData() {
+    const { trips: tripList } = await getTripsWithCoversForCurrentUser();
     const tripIds = tripList.map((trip) => trip.id);
 
     if (tripIds.length === 0) {
@@ -129,45 +80,16 @@ export default function OverviewPage() {
       return;
     }
 
-    const { data: expenseData, error: expenseError } = await supabase
-      .from("expenses")
-      .select("*")
-      .in("trip_id", tripIds)
-      .order("created_at", { ascending: false });
+    let expenseList: Expense[] = [];
 
-    if (expenseError) {
-      console.error(expenseError);
+    try {
+      expenseList = await getExpensesByTripIds(tripIds);
+    } catch (error) {
+      console.error(error);
     }
 
-    const { data: imageData, error: imageError } = await supabase
-      .from("itinerary_items")
-      .select("trip_id, image_url, day_number, time, created_at")
-      .in("trip_id", tripIds)
-      .not("image_url", "is", null)
-      .order("day_number", { ascending: true })
-      .order("time", { ascending: true });
-
-    if (imageError) {
-      console.error(imageError);
-    }
-
-    const coverMap: Record<string, string> = {};
-
-    (imageData || []).forEach((item: CoverImageItem) => {
-      if (!item.image_url) return;
-
-      if (!coverMap[item.trip_id]) {
-        coverMap[item.trip_id] = item.image_url;
-      }
-    });
-
-    const tripsWithCover = tripList.map((trip) => ({
-      ...trip,
-      cover_image_url: coverMap[trip.id] || null,
-    }));
-
-    setTrips(tripsWithCover);
-    setExpenses(expenseData || []);
+    setTrips(tripList);
+    setExpenses(expenseList);
   }
 
   const totalBudget = trips.reduce((sum, trip) => {
@@ -405,9 +327,7 @@ export default function OverviewPage() {
                             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 font-black text-cyan-300">
                               T
                             </div>
-                            <p className="text-xs text-zinc-500">
-                              暂无封面
-                            </p>
+                            <p className="text-xs text-zinc-500">暂无封面</p>
                           </div>
                         </div>
                       )}
