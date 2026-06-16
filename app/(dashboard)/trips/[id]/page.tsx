@@ -655,7 +655,7 @@ export default function TripDetailPage() {
   return (
     <main className="p-4 text-white sm:p-8">
       <section className="mb-8 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950">
-        <div className="relative min-h-[420px]">
+      <div className="relative min-h-[360px] sm:min-h-[420px]">
           {coverImageUrl ? (
             <img
               src={coverImageUrl}
@@ -668,7 +668,7 @@ export default function TripDetailPage() {
 
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/20" />
 
-          <div className="relative flex min-h-[420px] flex-col justify-between p-5 sm:p-8">
+          <div className="relative flex min-h-[360px] flex-col justify-between p-4 sm:min-h-[420px] sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Link
                 href="/trips"
@@ -694,7 +694,7 @@ export default function TripDetailPage() {
                 {tripStatus}
               </span>
 
-              <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-6xl">
+              <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight sm:text-6xl">
                 {trip.title}
               </h1>
 
@@ -718,7 +718,7 @@ export default function TripDetailPage() {
               )}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <div className="rounded-2xl border border-white/10 bg-black/35 p-4 backdrop-blur">
                 <p className="text-xs text-zinc-400">旅行预算</p>
                 <p className="mt-2 text-2xl font-bold">
@@ -868,7 +868,7 @@ export default function TripDetailPage() {
             ) : (
               <div className="space-y-8">
                 {groupedItemEntries.map(([day, dayItems]) => (
-                  <div key={day} className="rounded-3xl bg-zinc-950/50 p-4">
+                  <div key={day} className="rounded-3xl bg-zinc-950/50 p-3 sm:p-4">
                     <div className="mb-5 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-xs uppercase tracking-[0.3em] text-cyan-400">
@@ -884,7 +884,7 @@ export default function TripDetailPage() {
                       </span>
                     </div>
 
-                    <div className="relative border-l border-cyan-500/20 pl-5 sm:pl-7">
+                    <div className="relative border-l border-cyan-500/20 pl-4 sm:pl-7">
                       {dayItems.map((item, index) => (
                         <div
                           key={item.id}
@@ -892,11 +892,11 @@ export default function TripDetailPage() {
                             index === dayItems.length - 1 ? "pb-0" : "pb-5"
                           }`}
                         >
-                          <span className="absolute -left-[29px] top-2 h-4 w-4 rounded-full border-2 border-cyan-300 bg-zinc-950 shadow-[0_0_20px_rgba(34,211,238,0.7)] sm:-left-[35px]" />
+                          <span className="absolute -left-[25px] top-2 h-4 w-4 rounded-full border-2 border-cyan-300 bg-zinc-950 shadow-[0_0_20px_rgba(34,211,238,0.7)] sm:-left-[35px]" />
 
-                          <div className="min-h-[150px] rounded-3xl border border-zinc-800 bg-zinc-900/90 p-4 transition hover:border-cyan-500/40">
-                            <div className="grid grid-cols-[1fr_120px] gap-4 sm:grid-cols-[1fr_150px]">
-                              <div className="flex min-h-[118px] flex-col justify-between">
+                          <div className="rounded-3xl border border-zinc-800 bg-zinc-900/90 p-3 transition hover:border-cyan-500/40 sm:min-h-[150px] sm:p-4">
+                          <div className="grid gap-3 sm:grid-cols-[1fr_150px] sm:gap-4">
+                          <div className="flex flex-col justify-between sm:min-h-[118px]">
                                 <div>
                                   <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                                     <div>
@@ -914,7 +914,7 @@ export default function TripDetailPage() {
                                         </span>
                                       </div>
 
-                                      <h4 className="mt-3 line-clamp-1 text-2xl font-bold">
+                                      <h4 className="mt-3 line-clamp-2 text-xl font-bold sm:line-clamp-1 sm:text-2xl">
                                         {item.title}
                                       </h4>
                                     </div>
@@ -950,7 +950,7 @@ export default function TripDetailPage() {
                                 </div>
                               </div>
 
-                              <div className="h-[118px] overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950">
+                              <div className="h-32 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 sm:h-[118px]">
                                 {item.image_url ? (
                                   <button
                                     onClick={() =>
