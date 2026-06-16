@@ -3,51 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
-type Trip = {
-  id: string;
-  user_id: string | null;
-  title: string;
-  country: string | null;
-  city: string | null;
-  budget: number | string | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-  cover_image_url?: string | null;
-};
-
-type ItineraryImageItem = {
-  trip_id: string;
-  image_url: string | null;
-  day_number: number | null;
-  time: string | null;
-  created_at: string;
-};
-
-type TripStatus = "未开始" | "旅行中" | "已完成" | "待完善";
-
-function getTripStatus(trip: Trip): TripStatus {
-  if (!trip.start_date || !trip.end_date) {
-    return "待完善";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = new Date(`${trip.start_date}T00:00:00`);
-  const endDate = new Date(`${trip.end_date}T23:59:59`);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "待完善";
-  }
-
-  if (today < startDate) return "未开始";
-  if (today > endDate) return "已完成";
-
-  return "旅行中";
-}
+import {
+  getTripStatus,
+  getTripsWithCoversForCurrentUser,
+  type Trip,
+  type TripStatus,
+} from "@/lib/services/trips";
 
 function getStatusClass(status: TripStatus) {
   if (status === "旅行中") {
@@ -203,65 +164,21 @@ export default function PlannerPage() {
   }, []);
 
   async function fetchTrips() {
-    const { data: userData } = await supabase.auth.getUser();
+    try {
+      const { userId, trips: tripList } =
+        await getTripsWithCoversForCurrentUser();
 
-    if (!userData.user) {
-      router.push("/");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("user_id", userData.user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      alert(error.message);
-      setLoading(false);
-      return;
-    }
-
-    const tripList = data || [];
-    const tripIds = tripList.map((trip) => trip.id);
-
-    if (tripIds.length === 0) {
-      setTrips([]);
-      setLoading(false);
-      return;
-    }
-
-    const { data: imageItems, error: imageError } = await supabase
-      .from("itinerary_items")
-      .select("trip_id, image_url, day_number, time, created_at")
-      .in("trip_id", tripIds)
-      .order("day_number", { ascending: true })
-      .order("time", { ascending: true });
-
-    if (imageError) {
-      console.error(imageError);
-      setTrips(tripList);
-      setLoading(false);
-      return;
-    }
-
-    const coverMap: Record<string, string> = {};
-
-    (imageItems || []).forEach((item: ItineraryImageItem) => {
-      if (!item.image_url) return;
-
-      if (!coverMap[item.trip_id]) {
-        coverMap[item.trip_id] = item.image_url;
+      if (!userId) {
+        router.push("/");
+        return;
       }
-    });
 
-    const tripsWithCover = tripList.map((trip) => ({
-      ...trip,
-      cover_image_url: coverMap[trip.id] || null,
-    }));
-
-    setTrips(tripsWithCover);
-    setLoading(false);
+      setTrips(tripList);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "加载旅行规划失败");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const totalBudget = trips.reduce((sum, trip) => {
