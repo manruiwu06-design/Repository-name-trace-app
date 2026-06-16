@@ -3,67 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
-type Trip = {
-  id: string;
-  user_id: string | null;
-  title: string;
-  country: string | null;
-  city: string | null;
-  budget: number | string | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-};
-
-type Expense = {
-  id: string;
-  trip_id: string;
-  category: string | null;
-  amount: number | string;
-  description: string | null;
-  created_at: string;
-};
-
-type TripStatus = "未开始" | "旅行中" | "已完成" | "待完善";
-
-function getTripStatus(trip: Trip): TripStatus {
-  if (!trip.start_date || !trip.end_date) {
-    return "待完善";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = new Date(`${trip.start_date}T00:00:00`);
-  const endDate = new Date(`${trip.end_date}T23:59:59`);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "待完善";
-  }
-
-  if (today < startDate) return "未开始";
-  if (today > endDate) return "已完成";
-
-  return "旅行中";
-}
-
-function getStatusClass(status: TripStatus) {
-  if (status === "旅行中") {
-    return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30";
-  }
-
-  if (status === "未开始") {
-    return "bg-blue-500/15 text-blue-300 border-blue-500/30";
-  }
-
-  if (status === "已完成") {
-    return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
-  }
-
-  return "bg-zinc-700/50 text-zinc-300 border-zinc-600";
-}
+import {
+  getTripStatus,
+  getTripsForCurrentUser,
+  type Trip,
+  type TripStatus,
+} from "@/lib/services/trips";
+import {
+  getExpensesByTripIds,
+  type Expense,
+} from "@/lib/services/expenses";
 
 function formatMoney(value: number | string | null | undefined) {
   return `¥${Number(value || 0).toLocaleString("zh-CN")}`;
@@ -87,50 +36,30 @@ export default function AnalyticsPage() {
   }, []);
 
   async function fetchAnalyticsData() {
-    const { data: userData } = await supabase.auth.getUser();
+    try {
+      const { userId, trips: userTrips } = await getTripsForCurrentUser();
 
-    if (!userData.user) {
-      router.push("/");
-      return;
-    }
+      if (!userId) {
+        router.push("/");
+        return;
+      }
 
-    const tripsResult = await supabase
-      .from("trips")
-      .select("*")
-      .eq("user_id", userData.user.id)
-      .order("created_at", { ascending: false });
+      setTrips(userTrips);
 
-    if (tripsResult.error) {
-      alert(tripsResult.error.message);
+      const tripIds = userTrips.map((trip) => trip.id);
+
+      if (tripIds.length === 0) {
+        setExpenses([]);
+        return;
+      }
+
+      const expenseList = await getExpensesByTripIds(tripIds);
+      setExpenses(expenseList);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "加载数据中心失败");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const userTrips = tripsResult.data || [];
-    setTrips(userTrips);
-
-    const tripIds = userTrips.map((trip) => trip.id);
-
-    if (tripIds.length === 0) {
-      setExpenses([]);
-      setLoading(false);
-      return;
-    }
-
-    const expensesResult = await supabase
-      .from("expenses")
-      .select("*")
-      .in("trip_id", tripIds)
-      .order("created_at", { ascending: false });
-
-    if (expensesResult.error) {
-      alert(expensesResult.error.message);
-      setLoading(false);
-      return;
-    }
-
-    setExpenses(expensesResult.data || []);
-    setLoading(false);
   }
 
   const tripTitleMap = useMemo(() => {
@@ -190,6 +119,13 @@ export default function AnalyticsPage() {
   const pendingTrips = trips.filter(
     (trip) => getTripStatus(trip) === "待完善"
   );
+
+  const statusSummary: Array<[TripStatus, number]> = [
+    ["未开始", upcomingTrips.length],
+    ["旅行中", activeTrips.length],
+    ["已完成", completedTrips.length],
+    ["待完善", pendingTrips.length],
+  ];
 
   const expenseByCategory = expenses.reduce<Record<string, number>>(
     (result, expense) => {
@@ -437,14 +373,11 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="mt-5 space-y-3">
-              {[
-                ["未开始", upcomingTrips.length],
-                ["旅行中", activeTrips.length],
-                ["已完成", completedTrips.length],
-                ["待完善", pendingTrips.length],
-              ].map(([status, count]) => {
+              {statusSummary.map(([status, count]) => {
                 const percent =
-                  trips.length > 0 ? Math.round((Number(count) / trips.length) * 100) : 0;
+                  trips.length > 0
+                    ? Math.round((count / trips.length) * 100)
+                    : 0;
 
                 return (
                   <div key={status}>
