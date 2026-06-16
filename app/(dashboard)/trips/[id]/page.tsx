@@ -3,7 +3,14 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import {
+  getCurrentUserId,
+  getTripByIdForCurrentUser,
+  getTripStatus,
+  updateTripForCurrentUser,
+  type Trip,
+  type TripStatus,
+} from "@/lib/services/trips";
 import {
   createItineraryItem,
   deleteItineraryItem as deleteItineraryItemService,
@@ -19,20 +26,6 @@ import {
   updateExpense as updateExpenseService,
   type Expense,
 } from "@/lib/services/expenses";
-
-type Trip = {
-  id: string;
-  user_id: string | null;
-  title: string;
-  country: string | null;
-  city: string | null;
-  budget: number | string | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-};
-
-type TripStatus = "未开始" | "旅行中" | "已完成" | "待完善";
 
 type ItineraryForm = {
   dayNumber: string;
@@ -57,27 +50,6 @@ type ExpenseForm = {
 type EditingExpenseForm = ExpenseForm & {
   id: string;
 };
-
-function getTripStatus(trip: Trip): TripStatus {
-  if (!trip.start_date || !trip.end_date) {
-    return "待完善";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = new Date(`${trip.start_date}T00:00:00`);
-  const endDate = new Date(`${trip.end_date}T23:59:59`);
-
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "待完善";
-  }
-
-  if (today < startDate) return "未开始";
-  if (today > endDate) return "已完成";
-
-  return "旅行中";
-}
 
 function getStatusClass(status: TripStatus) {
   if (status === "旅行中") {
@@ -183,7 +155,6 @@ export default function TripDetailPage() {
     "其他",
   ];
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [trip, setTrip] = useState<Trip | null>(null);
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -225,33 +196,39 @@ export default function TripDetailPage() {
   }, []);
 
   async function initPage() {
-    const { data } = await supabase.auth.getUser();
-
-    if (!data.user) {
-      router.push("/");
-      return;
-    }
-
-    setCurrentUserId(data.user.id);
-
     if (!tripId) {
       router.push("/trips");
       return;
     }
 
-    await fetchTripData(data.user.id, tripId);
-    setLoading(false);
+    try {
+      const userId = await getCurrentUserId();
+
+      if (!userId) {
+        router.push("/");
+        return;
+      }
+
+      await fetchTripData(tripId);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "加载旅行详情失败");
+      router.push("/trips");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function fetchTripData(userId: string, targetTripId: string) {
-    const { data: tripData, error: tripError } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("id", targetTripId)
-      .eq("user_id", userId)
-      .single();
+  async function fetchTripData(targetTripId: string) {
+    let tripData: Trip | null = null;
 
-    if (tripError || !tripData) {
+    try {
+      const result = await getTripByIdForCurrentUser(targetTripId);
+      tripData = result.trip;
+    } catch (error) {
+      console.error(error);
+    }
+
+    if (!tripData) {
       alert("没有找到这趟旅行，或者你没有访问权限。");
       router.push("/trips");
       return;
@@ -280,8 +257,8 @@ export default function TripDetailPage() {
   }
 
   async function refreshData() {
-    if (!currentUserId || !tripId) return;
-    await fetchTripData(currentUserId, tripId);
+    if (!tripId) return;
+    await fetchTripData(tripId);
   }
 
   async function uploadItineraryImage(file: File) {
@@ -308,33 +285,28 @@ export default function TripDetailPage() {
   }
 
   async function updateTrip() {
-    if (!trip || !currentUserId) return;
+    if (!trip) return;
 
     if (!tripForm.title.trim()) {
       alert("请填写旅行名称");
       return;
     }
 
-    const { error } = await supabase
-      .from("trips")
-      .update({
+    try {
+      await updateTripForCurrentUser(trip.id, {
         title: tripForm.title.trim(),
         country: tripForm.country.trim() || null,
         city: tripForm.city.trim() || null,
         budget: tripForm.budget ? Number(tripForm.budget) : null,
         start_date: tripForm.startDate || null,
         end_date: tripForm.endDate || null,
-      })
-      .eq("id", trip.id)
-      .eq("user_id", currentUserId);
+      });
 
-    if (error) {
-      alert(error.message);
-      return;
+      setShowEditTripModal(false);
+      await refreshData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "保存旅行失败");
     }
-
-    setShowEditTripModal(false);
-    await refreshData();
   }
 
   function handleNewItemImageChange(event: ChangeEvent<HTMLInputElement>) {
