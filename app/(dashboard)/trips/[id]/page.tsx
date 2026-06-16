@@ -12,6 +12,13 @@ import {
   uploadItineraryImageForCurrentUser,
   type ItineraryItem,
 } from "@/lib/services/itinerary";
+import {
+  createExpense,
+  deleteExpense as deleteExpenseService,
+  getExpensesByTripId,
+  updateExpense as updateExpenseService,
+  type Expense,
+} from "@/lib/services/expenses";
 
 type Trip = {
   id: string;
@@ -22,17 +29,6 @@ type Trip = {
   budget: number | string | null;
   start_date: string | null;
   end_date: string | null;
-  created_at: string;
-};
-
-
-
-type Expense = {
-  id: string;
-  trip_id: string;
-  category: string | null;
-  amount: number | string;
-  description: string | null;
   created_at: string;
 };
 
@@ -265,20 +261,18 @@ export default function TripDetailPage() {
 
     let itineraryData: ItineraryItem[] = [];
 
-try {
-  itineraryData = await getItineraryItemsByTripId(targetTripId);
-} catch (error) {
-  console.error(error);
-}
+    try {
+      itineraryData = await getItineraryItemsByTripId(targetTripId);
+    } catch (error) {
+      console.error(error);
+    }
 
-    const { data: expenseData, error: expenseError } = await supabase
-      .from("expenses")
-      .select("*")
-      .eq("trip_id", targetTripId)
-      .order("created_at", { ascending: false });
+    let expenseData: Expense[] = [];
 
-    if (expenseError) {
-      console.error(expenseError);
+    try {
+      expenseData = await getExpensesByTripId(targetTripId);
+    } catch (error) {
+      console.error(error);
     }
 
     setItems(itineraryData || []);
@@ -294,7 +288,7 @@ try {
     if (!tripId) {
       throw new Error("缺少旅行 ID");
     }
-  
+
     return uploadItineraryImageForCurrentUser(tripId, file);
   }
 
@@ -446,9 +440,9 @@ try {
 
   async function deleteItineraryItem(itemId: string) {
     const confirmDelete = window.confirm("确定要删除这个行程吗？");
-  
+
     if (!confirmDelete) return;
-  
+
     try {
       await deleteItineraryItemService(itemId);
       await refreshData();
@@ -465,17 +459,14 @@ try {
       return;
     }
 
-    const { error } = await supabase.from("expenses").insert([
-      {
-        trip_id: tripId,
+    try {
+      await createExpense(tripId, {
         category: expenseForm.category || "其他",
         amount: Number(expenseForm.amount),
         description: expenseForm.description.trim() || null,
-      },
-    ]);
-
-    if (error) {
-      alert(error.message);
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "添加费用失败");
       return;
     }
 
@@ -501,17 +492,14 @@ try {
       return;
     }
 
-    const { error } = await supabase
-      .from("expenses")
-      .update({
+    try {
+      await updateExpenseService(editingExpenseForm.id, {
         category: editingExpenseForm.category || "其他",
         amount: Number(editingExpenseForm.amount),
         description: editingExpenseForm.description.trim() || null,
-      })
-      .eq("id", editingExpenseForm.id);
-
-    if (error) {
-      alert(error.message);
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "保存费用失败");
       return;
     }
 
@@ -524,17 +512,12 @@ try {
 
     if (!confirmDelete) return;
 
-    const { error } = await supabase
-      .from("expenses")
-      .delete()
-      .eq("id", expenseId);
-
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      await deleteExpenseService(expenseId);
+      await refreshData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "删除费用失败");
     }
-
-    await refreshData();
   }
 
   const totalSpent = expenses.reduce((sum, expense) => {
@@ -754,43 +737,47 @@ try {
             </div>
 
             {items.length === 0 ? (
-  <div className="rounded-3xl border border-dashed border-cyan-500/25 bg-cyan-500/5 p-8 text-center">
-    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
-      ✈️
-    </div>
+              <div className="rounded-3xl border border-dashed border-cyan-500/25 bg-cyan-500/5 p-8 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
+                  ✈️
+                </div>
 
-    <h3 className="mt-5 text-xl font-bold text-white">还没有行程记录</h3>
+                <h3 className="mt-5 text-xl font-bold text-white">
+                  还没有行程记录
+                </h3>
 
-    <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
-      把每天要去的地点、美食、住宿和交通安排记录下来，这趟旅行就会变成完整的时间线档案。
-    </p>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
+                  把每天要去的地点、美食、住宿和交通安排记录下来，这趟旅行就会变成完整的时间线档案。
+                </p>
 
-    <button
-      onClick={() => setShowAddItineraryModal(true)}
-      className="mt-6 rounded-full bg-cyan-500 px-5 py-3 text-sm font-black text-black hover:bg-cyan-400"
-    >
-      ＋ 添加第一条行程
-    </button>
-  </div>
-) : groupedItemEntries.length === 0 ? (
-  <div className="rounded-3xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center">
-  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800 text-xl">
-    🔎
-  </div>
+                <button
+                  onClick={() => setShowAddItineraryModal(true)}
+                  className="mt-6 rounded-full bg-cyan-500 px-5 py-3 text-sm font-black text-black hover:bg-cyan-400"
+                >
+                  ＋ 添加第一条行程
+                </button>
+              </div>
+            ) : groupedItemEntries.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-zinc-800 bg-black/20 p-8 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800 text-xl">
+                  🔎
+                </div>
 
-  <h3 className="mt-4 text-lg font-bold text-white">当前分类暂无行程</h3>
+                <h3 className="mt-4 text-lg font-bold text-white">
+                  当前分类暂无行程
+                </h3>
 
-  <p className="mt-2 text-sm text-zinc-500">
-    可以切换上方分类，或者添加一条新的行程记录。
-  </p>
+                <p className="mt-2 text-sm text-zinc-500">
+                  可以切换上方分类，或者添加一条新的行程记录。
+                </p>
 
-  <button
-    onClick={() => setShowAddItineraryModal(true)}
-    className="mt-5 rounded-full bg-zinc-800 px-5 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-700"
-  >
-    ＋ 添加行程
-  </button>
-</div>
+                <button
+                  onClick={() => setShowAddItineraryModal(true)}
+                  className="mt-5 rounded-full bg-zinc-800 px-5 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-700"
+                >
+                  ＋ 添加行程
+                </button>
+              </div>
             ) : (
               <div className="space-y-8">
                 {groupedItemEntries.map(([day, dayItems]) => (
@@ -976,16 +963,18 @@ try {
 
             {expenseCategorySummary.length === 0 ? (
               <div className="mt-5 rounded-3xl border border-dashed border-zinc-800 bg-black/20 p-6 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800 text-xl">
-                💳
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-800 text-xl">
+                  💳
+                </div>
+
+                <h3 className="mt-4 text-lg font-bold text-white">
+                  还没有费用数据
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-zinc-500">
+                  添加费用后，这里会自动生成餐饮、住宿、交通等分类占比。
+                </p>
               </div>
-            
-              <h3 className="mt-4 text-lg font-bold text-white">还没有费用数据</h3>
-            
-              <p className="mt-2 text-sm leading-6 text-zinc-500">
-                添加费用后，这里会自动生成餐饮、住宿、交通等分类占比。
-              </p>
-            </div>
             ) : (
               <div className="mt-5 space-y-4">
                 {expenseCategorySummary.map((item) => (
@@ -1045,25 +1034,28 @@ try {
 
             {filteredExpenses.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-cyan-500/25 bg-cyan-500/5 p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
-                💰
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/15 text-2xl">
+                  💰
+                </div>
+
+                <h3 className="mt-5 text-xl font-bold text-white">
+                  {expenseFilter === "全部"
+                    ? "还没有费用记录"
+                    : "当前分类暂无费用"}
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
+                  记录餐饮、住宿、交通和门票开销后，Trace
+                  会帮你自动计算预算使用情况。
+                </p>
+
+                <button
+                  onClick={() => setShowAddExpenseModal(true)}
+                  className="mt-6 rounded-full bg-cyan-500 px-5 py-3 text-sm font-black text-black hover:bg-cyan-400"
+                >
+                  ＋ 添加费用
+                </button>
               </div>
-            
-              <h3 className="mt-5 text-xl font-bold text-white">
-                {expenseFilter === "全部" ? "还没有费用记录" : "当前分类暂无费用"}
-              </h3>
-            
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
-                记录餐饮、住宿、交通和门票开销后，Trace 会帮你自动计算预算使用情况。
-              </p>
-            
-              <button
-                onClick={() => setShowAddExpenseModal(true)}
-                className="mt-6 rounded-full bg-cyan-500 px-5 py-3 text-sm font-black text-black hover:bg-cyan-400"
-              >
-                ＋ 添加费用
-              </button>
-            </div>
             ) : (
               <div className="space-y-3">
                 {filteredExpenses.map((expense) => (
