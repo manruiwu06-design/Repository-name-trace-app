@@ -59,14 +59,25 @@ export default function Home() {
   }, []);
 
   async function checkUser() {
-    const { data } = await supabase.auth.getUser();
-
-    if (data.user) {
-      router.replace("/overview");
-      return;
+    try {
+      const timeout = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 3000);
+      });
+  
+      const result = await Promise.race([
+        supabase.auth.getUser(),
+        timeout,
+      ]);
+  
+      if (result && "data" in result && result.data.user) {
+        router.replace("/overview");
+        return;
+      }
+    } catch (error) {
+      console.error("检查登录状态失败：", error);
+    } finally {
+      setCheckingSession(false);
     }
-
-    setCheckingSession(false);
   }
 
   function switchMode(nextMode: AuthMode) {
